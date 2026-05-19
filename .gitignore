@@ -1,0 +1,78 @@
+# ==============================================================================
+# OS & System Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+.directory
+
+# ==============================================================================
+# Python Environment & Virtual Environments
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==============================================================================
+# Jupyter Notebooks & Scratchpads
+# ==============================================================================
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# ==============================================================================
+# Credentials, Secrets, & Local Configurations (CRITICAL)
+# ==============================================================================
+.env
+.env.*
+secrets.json
+credentials.json
+*.pem
+*.key
+*.json
+
+# ==============================================================================
+# dbt (Data Build Tool) Local Artifacts
+# ==============================================================================
+transform/logs/
+transform/target/
+transform/dbt_packages/
+transform/dbt_modules/
+transform/profiles.yml
+
+# ==============================================================================
+# IDEs & Code Editors
+# ==============================================================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==============================================================================
+# Local Data Dumps / Temporary JSON & CSV payloads
+# ==============================================================================
+*.csv
+*.json
+*.xlsx
+*.gz
