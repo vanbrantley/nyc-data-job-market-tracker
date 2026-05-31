@@ -114,6 +114,27 @@ class TheirStackClient:
     # Public API
     # ------------------------------------------------------------------ #
 
+    def get_usage_stats(self) -> dict:
+        """
+        Fetch current credit balance from the TheirStack billing endpoint.
+
+        Endpoint: GET https://api.theirstack.com/v0/billing/credit-balance
+        Returns a dict with api_credits, used_api_credits, and
+        earliest_expiration. Raises on HTTP or network errors.
+        """
+        response = requests.get(
+            "https://api.theirstack.com/v0/billing/credit-balance",
+            headers=self._headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "api_credits": data.get("api_credits"),
+            "used_api_credits": data.get("used_api_credits"),
+            "earliest_expiration": data.get("earliest_expiration"),
+        }
+
     def fetch_all(
         self,
         discovered_at_gte: str | None = None,

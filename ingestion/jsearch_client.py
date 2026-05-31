@@ -70,10 +70,27 @@ class JSearchClient:
             "Content-Type": "application/json",
         }
         self._ingested_at = datetime.now(timezone.utc).isoformat()
+        self._last_response: requests.Response | None = None
 
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
+
+    def get_usage_stats(self) -> dict:
+        """
+        Return rate-limit headers from the most recent API response.
+
+        Returns an empty dict if no request has been made yet.
+        Header values are strings as returned by the API.
+        """
+        if self._last_response is None:
+            return {}
+        h = self._last_response.headers
+        return {
+            "requests_remaining": h.get("x-ratelimit-requests-remaining"),
+            "requests_limit": h.get("x-ratelimit-requests-limit"),
+            "requests_reset": h.get("x-ratelimit-requests-reset"),
+        }
 
     def fetch_all(
         self,
@@ -194,6 +211,7 @@ class JSearchClient:
                     params=params,
                     timeout=REQUEST_TIMEOUT,
                 )
+                self._last_response = response  # captured for get_usage_stats()
 
                 # 429 — rate limited; back off and retry
                 if response.status_code == 429:

@@ -29,6 +29,12 @@ def run_pipeline() -> bool:
     run_start = datetime.now(timezone.utc)
     log.info(f"Pipeline run starting at {run_start.isoformat()}")
 
+    # Instantiate all clients up front so they remain in scope for the
+    # run summary (usage stats) at the end of the function.
+    jsearch_client = JSearchClient()
+    theirstack_client = TheirStackClient()
+    builtin_scraper = BuiltInNYCScraper()
+
     results: dict[str, list[dict] | None] = {
         "jsearch": None,
         "theirstack": None,
@@ -40,8 +46,7 @@ def run_pipeline() -> bool:
     # 1. JSearch
     # ------------------------------------------------------------------ #
     try:
-        client = JSearchClient()
-        results["jsearch"] = client.fetch_all(
+        results["jsearch"] = jsearch_client.fetch_all(
             queries=[
                 "Data Analyst in New York",
                 "Analytics Engineer in New York",
@@ -68,8 +73,7 @@ def run_pipeline() -> bool:
                 f"Falling back to full 7-day window."
             )
 
-        client = TheirStackClient()
-        results["theirstack"] = client.fetch_all(discovered_at_gte=discovered_at_gte)
+        results["theirstack"] = theirstack_client.fetch_all(discovered_at_gte=discovered_at_gte)
         log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
     except Exception as e:
         log.error(f"TheirStack source FAILED: {e}", exc_info=True)
@@ -79,8 +83,7 @@ def run_pipeline() -> bool:
     # 3. Built In NYC
     # ------------------------------------------------------------------ #
     try:
-        scraper = BuiltInNYCScraper()
-        results["builtin"] = scraper.fetch_all()
+        results["builtin"] = builtin_scraper.fetch_all()
         log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
     except Exception as e:
         log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
@@ -109,6 +112,45 @@ def run_pipeline() -> bool:
     # 5. Run summary
     # ------------------------------------------------------------------ #
     duration = (datetime.now(timezone.utc) - run_start).total_seconds()
+
+    # API usage / credit stats — failures here must never affect the exit code.
+    try:
+        js = jsearch_client.get_usage_stats()
+        if js:
+            remaining = js.get("requests_remaining", "?")
+            limit = js.get("requests_limit", "?")
+            reset = js.get("requests_reset", "?")
+            log.info(
+                f"JSearch    — {remaining} of {limit} requests remaining "
+                f"(resets in {reset}s)"
+            )
+        else:
+            log.info("JSearch    — no usage stats available (no requests made).")
+    except Exception as e:
+        log.warning(f"Could not retrieve JSearch usage stats: {e}")
+
+    try:
+        ts = theirstack_client.get_usage_stats()
+        total = ts.get("api_credits", "?")
+        used = ts.get("used_api_credits", "?")
+        remaining = int(total) - int(used) if isinstance(total, int) and isinstance(used, int) else "?"
+        expiry = (ts.get("earliest_expiration") or "")[:10]  # trim to YYYY-MM-DD
+        log.info(
+            f"TheirStack — {remaining} of {total} API credits remaining "
+            f"({used} used, expires {expiry})"
+        )
+    except Exception as e:
+        log.warning(f"Could not retrieve TheirStack usage stats: {e}")
+
+    jsearch_count = len(results["jsearch"]) if results["jsearch"] else 0
+    theirstack_count = len(results["theirstack"]) if results["theirstack"] else 0
+    builtin_count = len(results["builtin"]) if results["builtin"] else 0
+    total_count = jsearch_count + theirstack_count + builtin_count
+    log.info(
+        f"Row counts — jsearch: {jsearch_count} | theirstack: {theirstack_count} "
+        f"| builtin: {builtin_count} | total: {total_count}"
+    )
+
     if failures:
         log.error(
             f"Pipeline finished with failures in: {failures}. "
