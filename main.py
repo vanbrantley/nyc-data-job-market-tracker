@@ -42,71 +42,86 @@ def run_pipeline() -> bool:
     }
     failures: list[str] = []
 
-    # ------------------------------------------------------------------ #
-    # 1. JSearch
-    # ------------------------------------------------------------------ #
-    try:
-        results["jsearch"] = jsearch_client.fetch_all(
-            queries=[
-                "Data Analyst in New York",
-                "Analytics Engineer in New York",
-            ],
-            date_posted="3days",
-        )
-        log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
-    except Exception as e:
-        log.error(f"JSearch source FAILED: {e}", exc_info=True)
-        failures.append("jsearch")
-
-    # ------------------------------------------------------------------ #
-    # 2. TheirStack
-    # ------------------------------------------------------------------ #
-    try:
-        # Get high-water mark from Snowflake to fetch only new jobs
-        discovered_at_gte = None
+    with SnowflakeLoader() as loader:
+        # ------------------------------------------------------------------ #
+        # 1. JSearch — collect then immediately load
+        # ------------------------------------------------------------------ #
         try:
-            with SnowflakeLoader() as loader:
-                discovered_at_gte = loader.get_theirstack_high_water_mark()
-        except Exception as e:
-            log.warning(
-                f"Could not fetch TheirStack high-water mark: {e}. "
-                f"Falling back to full 7-day window."
+            results["jsearch"] = jsearch_client.fetch_all(
+                queries=[
+                    "Data Analyst in New York",
+                    "Analytics Engineer in New York",
+                ],
+                date_posted="3days",
             )
+            log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
+        except Exception as e:
+            log.error(f"JSearch source FAILED: {e}", exc_info=True)
+            failures.append("jsearch")
 
-        results["theirstack"] = theirstack_client.fetch_all(discovered_at_gte=discovered_at_gte)
-        log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
-    except Exception as e:
-        log.error(f"TheirStack source FAILED: {e}", exc_info=True)
-        failures.append("theirstack")
-
-    # ------------------------------------------------------------------ #
-    # 3. Built In NYC
-    # ------------------------------------------------------------------ #
-    try:
-        results["builtin"] = builtin_scraper.fetch_all()
-        log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
-    except Exception as e:
-        log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
-        failures.append("builtin")
-
-    # ------------------------------------------------------------------ #
-    # 4. Load to Snowflake
-    # ------------------------------------------------------------------ #
-    all_rows = [row for source, rows in results.items() if rows for row in rows]
-
-    if not all_rows:
-        log.error("No rows collected from any source — skipping Snowflake load.")
-        failures.append("snowflake_load_skipped")
-    else:
-        log.info(f"Loading {len(all_rows)} total rows to Snowflake.")
         try:
-            with SnowflakeLoader() as loader:
-                load_results = loader.load(all_rows)
+            if results["jsearch"]:
+                load_results = loader.load(results["jsearch"])
                 for table, count in load_results.items():
                     log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("JSearch — no rows to load, skipping Snowflake write.")
         except Exception as e:
-            log.error(f"Snowflake load FAILED: {e}", exc_info=True)
-            failures.append("snowflake")
+            log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("jsearch_snowflake")
+
+        # ------------------------------------------------------------------ #
+        # 2. TheirStack — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            discovered_at_gte = None
+            try:
+                discovered_at_gte = loader.get_theirstack_high_water_mark()
+            except Exception as e:
+                log.warning(
+                    f"Could not fetch TheirStack high-water mark: {e}. "
+                    f"Falling back to full 7-day window."
+                )
+
+            results["theirstack"] = theirstack_client.fetch_all(
+                discovered_at_gte=discovered_at_gte
+            )
+            log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
+        except Exception as e:
+            log.error(f"TheirStack source FAILED: {e}", exc_info=True)
+            failures.append("theirstack")
+
+        try:
+            if results["theirstack"]:
+                load_results = loader.load(results["theirstack"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("TheirStack — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("theirstack_snowflake")
+
+        # ------------------------------------------------------------------ #
+        # 3. Built In NYC — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            results["builtin"] = builtin_scraper.fetch_all()
+            log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
+        except Exception as e:
+            log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
+            failures.append("builtin")
+
+        try:
+            if results["builtin"]:
+                load_results = loader.load(results["builtin"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("builtin_snowflake")
 
     # ------------------------------------------------------------------ #
     # 5. Run summary
@@ -133,7 +148,11 @@ def run_pipeline() -> bool:
         ts = theirstack_client.get_usage_stats()
         total = ts.get("api_credits", "?")
         used = ts.get("used_api_credits", "?")
-        remaining = int(total) - int(used) if isinstance(total, int) and isinstance(used, int) else "?"
+        remaining = (
+            int(total) - int(used)
+            if isinstance(total, int) and isinstance(used, int)
+            else "?"
+        )
         expiry = (ts.get("earliest_expiration") or "")[:10]  # trim to YYYY-MM-DD
         log.info(
             f"TheirStack — {remaining} of {total} API credits remaining "
