@@ -1,0 +1,38 @@
+---------------------------------------------------------
+-- NYC JOB MARKET TRACKER: INGESTION LAYER SETUP RUNBOOK
+---------------------------------------------------------
+
+-- 1. Create a dedicated, cost-conscious Compute Warehouse
+CREATE WAREHOUSE IF NOT EXISTS nyc_job_tracker_wh
+    WITH WAREHOUSE_SIZE = 'XSMALL'
+    AUTO_SUSPEND = 60 -- Shuts down automatically after 60 seconds of idling
+    AUTO_RESUME = TRUE
+    COMMENT = 'Dedicated compute warehouse for NYC Job Market Tracker pipeline';
+
+-- 2. Create the Raw Ingestion Layer Database
+CREATE DATABASE IF NOT EXISTS raw;
+
+-- 3. Create isolated schemas for each distinct data source
+CREATE SCHEMA IF NOT EXISTS raw.jsearch;
+CREATE SCHEMA IF NOT EXISTS raw.theirstack;
+CREATE SCHEMA IF NOT EXISTS raw.builtin;
+
+-- 4. Create the target landing tables with completely generic definitions.
+-- No defaults here; Python will explicitly supply the SOURCE metadata string.
+CREATE TABLE IF NOT EXISTS raw.jsearch.src_postings (
+    source VARCHAR,
+    raw_payload VARIANT,
+    ingested_at TIMESTAMP_TZ
+);
+
+CREATE TABLE IF NOT EXISTS raw.theirstack.src_postings (
+    source VARCHAR,
+    raw_payload VARIANT,
+    ingested_at TIMESTAMP_TZ
+);
+
+CREATE TABLE IF NOT EXISTS raw.builtin.src_postings (
+    source VARCHAR,
+    raw_payload VARIANT,
+    ingested_at TIMESTAMP_TZ
+);

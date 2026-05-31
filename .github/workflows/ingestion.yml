@@ -1,0 +1,42 @@
+name: NYC Job Market — Ingestion Pipeline
+
+on:
+  schedule:
+    - cron: "0 9 * * 1,4"  # 9am UTC every Monday and Thursday (~every 3 days)
+  workflow_dispatch:         # allow manual trigger from GitHub UI for testing
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ingestion pipeline
+        env:
+          RAPIDAPI_KEY:        ${{ secrets.RAPIDAPI_KEY }}
+          THEIRSTACK_KEY:      ${{ secrets.THEIRSTACK_KEY }}
+          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+        run: python main.py
