@@ -37,7 +37,8 @@ RAPIDAPI_HOST = "jsearch.p.rapidapi.com"
 # 200 credits/month, runs every 3 days (~10 runs/month),
 # 2 queries per run → 10 pages per query uses 200 credits exactly.
 # Set to 9 to leave a small buffer for reruns / debugging.
-MAX_PAGES_PER_QUERY = 9
+# MAX_PAGES_PER_QUERY = 9
+MAX_PAGES_PER_QUERY = 2  # down from 9 to save tokens in case of pipeline test failure
 
 RESULTS_PER_PAGE = 10  # JSearch default; not configurable on free tier
 MAX_RETRIES = 3

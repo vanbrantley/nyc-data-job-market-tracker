@@ -110,7 +110,8 @@ class SnowflakeLoader:
                 cur.executemany(
                     f"""
                     INSERT INTO {table} (SOURCE, RAW_PAYLOAD, INGESTED_AT)
-                    SELECT %s, PARSE_JSON(%s), %s::TIMESTAMP_TZ
+                    SELECT $1, PARSE_JSON($2), $3::TIMESTAMP_TZ
+                    FROM VALUES (%s, %s, %s)
                     """,
                     batch,
                 )

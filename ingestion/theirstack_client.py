@@ -35,7 +35,8 @@ BASE_URL = "https://api.theirstack.com/v1/jobs/search"
 
 # 200 credits/month, ~4 runs/month at weekly cadence.
 # 15 credits/run × 4 runs = 60 credits, leaving 140 for testing/debugging.
-PRODUCTION_LIMIT = 15
+# PRODUCTION_LIMIT = 15
+PRODUCTION_LIMIT = 3  # down from 15 for testing pipeline
 
 FREE_SWEEP_PAGE_SIZE = 25  # max TheirStack returns per page
 MAX_RETRIES = 3
