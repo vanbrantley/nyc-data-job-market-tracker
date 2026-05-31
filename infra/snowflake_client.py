@@ -30,6 +30,12 @@ log = logging.getLogger(__name__)
 # Constants
 # ------------------------------------------------------------------ #
 
+SOURCE_TABLE_MAP = {
+    "jsearch": "RAW.JSEARCH.SRC_POSTINGS",
+    "theirstack": "RAW.THEIRSTACK.SRC_POSTINGS",
+    "builtin": "RAW.BUILTIN.SRC_POSTINGS",
+}
+
 
 class SnowflakeLoader:
     """
