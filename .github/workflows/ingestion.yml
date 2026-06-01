@@ -1,8 +1,8 @@
 name: NYC Job Market — Ingestion Pipeline
 
 on:
-  schedule:
-    - cron: "0 9 * * 1,4"  # 9am UTC every Monday and Thursday (~every 3 days)
+  # schedule:
+  #   - cron: "0 9 * * 1,4"  # 9am UTC every Monday and Thursday (~every 3 days)
   workflow_dispatch:         # allow manual trigger from GitHub UI for testing
 
 jobs:
