@@ -39,6 +39,7 @@ jobs:
       #     SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
       #     SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
       #     SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+      #     PYTHONPATH:          ${{ github.workspace }}
       #   run: python ingestion/run_ingestion.py
 
       - name: Run enrichment
@@ -50,4 +51,5 @@ jobs:
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
           OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
+          PYTHONPATH:          ${{ github.workspace }}
         run: python enrichment/run_enrichment.py
