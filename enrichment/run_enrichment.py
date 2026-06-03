@@ -1,26 +1,35 @@
+# run_enrichment.py — Enrichment Pipeline
+# Triggered by GitHub Actions after ingestion completes.
+# Pulls all unenriched jobs from Snowflake, enriches via gpt-4o-mini,
+# validates with Pydantic, and writes results to enriched.public.job_enrichment.
+
 import json
 import logging
 import os
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import snowflake.connector
+from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import ValidationError
 
 from enrichment.schemas.enrichment_schema import JobEnrichmentSchema
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
 )
-log = logging.getLogger(__name__)
+log = logging.getLogger("enrichment_orchestrator")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -29,7 +38,7 @@ MODEL_VERSION = "gpt-4o-mini"
 MAX_TOKENS = 512
 TEMPERATURE = 0
 MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds between retries
+RETRY_DELAY = 2
 PROMPT_PATH = Path(__file__).parent / "prompts" / "job_extraction.txt"
 
 # ---------------------------------------------------------------------------
@@ -208,8 +217,9 @@ def write_row(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-def run() -> bool:
-    log.info("=== LLM Enricher starting ===")
+def run_pipeline() -> bool:
+    run_start = datetime.now(timezone.utc)
+    log.info(f"Enrichment pipeline starting at {run_start.isoformat()}")
 
     system_prompt = load_prompt()
     log.info(f"Loaded prompt from {PROMPT_PATH} ({len(system_prompt)} chars)")
@@ -262,14 +272,25 @@ def run() -> bool:
     cur.close()
     conn.close()
 
-    log.info("=== LLM Enricher complete ===")
+    duration = (datetime.now(timezone.utc) - run_start).total_seconds()
+
+    log.info("=== Enrichment pipeline complete ===")
     log.info(f"    Succeeded : {succeeded}")
     log.info(f"    Failed    : {failed}")
     log.info(f"    Skipped   : {skipped}")
     log.info(f"    Total     : {len(jobs)}")
+    log.info(f"    Duration  : {duration:.1f}s")
 
     if failed > 0:
-        log.error(f"{failed} jobs failed enrichment — check logs above")
+        log.error(
+            f"Pipeline finished with {failed} failures. Duration: {duration:.1f}s"
+        )
         return False
 
+    log.info(f"Pipeline finished successfully. Duration: {duration:.1f}s")
     return True
+
+
+if __name__ == "__main__":
+    success = run_pipeline()
+    sys.exit(0 if success else 1)
