@@ -39,4 +39,4 @@ jobs:
           SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
-        run: python main.py
+        run: python ingestion/run_ingestion.py

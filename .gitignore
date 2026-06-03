@@ -53,11 +53,11 @@ credentials.json
 # ==============================================================================
 # dbt (Data Build Tool) Local Artifacts
 # ==============================================================================
-transform/logs/
-transform/target/
-transform/dbt_packages/
-transform/dbt_modules/
-transform/profiles.yml
+transformation/logs/
+transformation/target/
+transformation/dbt_packages/
+transformation/dbt_modules/
+transformation/profiles.yml
 
 # ==============================================================================
 # IDEs & Code Editors

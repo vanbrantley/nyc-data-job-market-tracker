@@ -1,4 +1,4 @@
-# main.py — Pipeline Orchestrator
+# run_ingestion.py — Ingestion Orchestrator
 # Triggered every 3 days by GitHub Actions cron.
 # Runs all ingestion sources independently — a failure in one
 # logs the error and allows the others to continue, but the overall

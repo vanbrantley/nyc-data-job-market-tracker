@@ -1,0 +1,30 @@
+name: nyc_job_tracker
+version: "1.0.0"
+config-version: 2
+
+profile: nyc_job_tracker # Matches the main key in your ~/.dbt/profiles.yml
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  nyc_job_tracker:
+    # Everything inside models/staging/ will build as a View
+    staging:
+      +materialized: view
+      
+    # Everything inside models/intermediate/ will act as a reusable compile-time CTE
+    intermediate:
+      +materialized: ephemeral
+      
+    # Everything inside models/marts/ will build as a physical Table
+    marts:
+      +materialized: table

@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: raw_jobs
+    database: RAW
+    loaded_at_field: INGESTED_AT
+    tables:
+      - name: src_jsearch
+        schema: jsearch
+        identifier: src_postings
+        freshness:
+          warn_after: {count: 72, period: hour} # Warn if no new data in 3 days
+          error_after: {count: 144, period: hour}
+          
+      - name: src_theirstack
+        schema: theirstack
+        identifier: src_postings
+        freshness:
+          warn_after: {count: 72, period: hour}
+          error_after: {count: 144, period: hour}
+
+      - name: src_builtin
+        schema: builtin
+        identifier: src_postings
+        freshness:
+          warn_after: {count: 72, period: hour}
+          error_after: {count: 144, period: hour}
