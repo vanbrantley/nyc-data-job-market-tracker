@@ -1,0 +1,125 @@
+version: 2
+
+models:
+  - name: fct_job_postings
+    description: >
+      Final wide table of NYC data job postings for the Streamlit dashboard.
+      Unions JSearch, TheirStack, and Built In sources; deduplicates cross-source
+      matches; joins LLM enrichment; and filters out senior and software-engineer roles.
+    columns:
+      - name: job_id
+        description: Unique identifier from the source API.
+        tests:
+          - unique
+          - not_null
+
+      - name: source
+        description: Source API (jsearch, theirstack, builtin).
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['jsearch', 'theirstack', 'builtin']
+
+      - name: job_title
+        description: Job title as posted by the employer.
+        tests:
+          - not_null
+
+      - name: company_name
+        description: Hiring company name.
+
+      - name: job_url
+        description: Direct link to the job posting.
+
+      - name: date_posted
+        description: Date the job was posted, normalized to a plain date (no timezone).
+
+      - name: description
+        description: >
+          Full job description text. Plain text for all sources — 
+          HTML stripped for Built In. Excluded from default display 
+          but available for the job detail panel in Streamlit.
+
+      - name: city
+        description: City of the job location. Null for fully remote postings (~11%).
+
+      - name: state
+        description: State or region code of the job location.
+
+      - name: country
+        description: Country code of the job location.
+
+      - name: latitude
+        description: Latitude coordinate of the job location.
+
+      - name: longitude
+        description: Longitude coordinate of the job location.
+
+      - name: work_model
+        description: Work arrangement (remote, hybrid, onsite).
+        tests:
+          - accepted_values:
+              values: ['remote', 'hybrid', 'onsite']
+
+      - name: employment_type
+        description: Employment classification (full_time, part_time, contract, other).
+        tests:
+          - accepted_values:
+              values: ['full_time', 'part_time', 'contract', 'other']
+
+      - name: final_salary_min
+        description: >
+          Minimum annual salary in USD. Prefers structured payload value; falls
+          back to LLM estimate. ~63% coverage. No sanity bounds applied.
+
+      - name: final_salary_max
+        description: >
+          Maximum annual salary in USD. Prefers structured payload value; falls
+          back to LLM estimate. ~63% coverage. No sanity bounds applied.
+
+      - name: inferred_seniority
+        description: Seniority level inferred by GPT-4o-mini from the job description.
+
+      - name: role_archetype
+        description: >
+          High-level role category assigned by LLM (e.g. data_analyst, data_engineer).
+          software_engineer rows are excluded from this table.
+
+      - name: work_focus
+        description: Primary work focus area inferred by LLM.
+
+      - name: is_title_inflated
+        description: Boolean flag set by LLM when the title appears inflated relative to the actual role.
+
+      - name: inflation_reasoning
+        description: LLM explanation for title inflation. Null (~85%) when is_title_inflated is FALSE.
+
+      - name: tech_stack_required
+        description: VARIANT array of required technologies extracted by LLM.
+
+      - name: tech_stack_preferred
+        description: VARIANT array of preferred technologies extracted by LLM.
+
+      - name: paradigms_required
+        description: VARIANT array of required technical paradigms extracted by LLM.
+
+      - name: paradigms_preferred
+        description: VARIANT array of preferred technical paradigms extracted by LLM.
+
+      - name: degree_requirement
+        description: Degree requirement level inferred by LLM (e.g. none, bachelors, masters).
+
+      - name: years_required_min
+        description: Minimum years of experience required, extracted by LLM.
+
+      - name: years_required_max
+        description: Maximum years of experience required, extracted by LLM.
+
+      - name: confidence_score
+        description: LLM self-reported confidence score for the enrichment output (0–1).
+
+      - name: enriched_at
+        description: Timestamp when the LLM enrichment was written.
+
+      - name: ingested_at
+        description: Timestamp when the raw payload was written to Snowflake.
