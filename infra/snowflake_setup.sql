@@ -2,27 +2,57 @@
 -- NYC JOB MARKET TRACKER: FULL INFRASTRUCTURE RUNBOOK
 -- Fully qualified names throughout — safe to run from
 -- any worksheet regardless of UI dropdown state.
+--
+-- IMPORTANT: Snowflake UI requires running each STEP
+-- separately. Highlight each step block and run it
+-- before moving to the next one.
 ---------------------------------------------------------
 
+---------------------------------------------------------
+-- STEP 1: Role and warehouse
+---------------------------------------------------------
 USE ROLE SYSADMIN;
-USE WAREHOUSE nyc_job_tracker_wh;
 
--- Compute Warehouse
 CREATE WAREHOUSE IF NOT EXISTS nyc_job_tracker_wh
     WITH WAREHOUSE_SIZE = 'XSMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
     COMMENT = 'Dedicated compute warehouse for NYC Job Market Tracker pipeline';
 
+USE WAREHOUSE nyc_job_tracker_wh;
+
 ---------------------------------------------------------
--- RAW DATABASE — Ingestion landing layer
+-- STEP 2: Create all databases
+-- Run each CREATE DATABASE line individually —
+-- the UI sometimes only executes the last statement
+-- when multiple are selected together.
 ---------------------------------------------------------
 CREATE DATABASE IF NOT EXISTS raw;
 
+-- Run above, then run below separately:
+CREATE DATABASE IF NOT EXISTS enriched;
+
+-- Run above, then run below separately:
+CREATE DATABASE IF NOT EXISTS analytics_dev;
+
+-- Run above, then run below separately:
+CREATE DATABASE IF NOT EXISTS analytics_prod;
+
+---------------------------------------------------------
+-- STEP 3: Create schemas
+-- Safe to run all together once databases exist.
+---------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS raw.jsearch;
 CREATE SCHEMA IF NOT EXISTS raw.theirstack;
 CREATE SCHEMA IF NOT EXISTS raw.builtin;
+CREATE SCHEMA IF NOT EXISTS enriched.public;
+CREATE SCHEMA IF NOT EXISTS analytics_dev.public;
+CREATE SCHEMA IF NOT EXISTS analytics_prod.public;
 
+---------------------------------------------------------
+-- STEP 4: Create raw tables
+-- Safe to run all together.
+---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS raw.jsearch.src_postings (
     source       VARCHAR,
     raw_payload  VARIANT,
@@ -42,26 +72,52 @@ CREATE TABLE IF NOT EXISTS raw.builtin.src_postings (
 );
 
 ---------------------------------------------------------
--- ENRICHED DATABASE — LLM enrichment output layer
+-- STEP 5: Create enrichment table
 ---------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS enriched;
-
-CREATE SCHEMA IF NOT EXISTS enriched.public;
-
 CREATE TABLE IF NOT EXISTS enriched.public.job_enrichment (
     job_id               VARCHAR,
     source               VARCHAR,
-    years_required_min   INTEGER,
-    years_required_max   INTEGER,
     inferred_seniority   VARCHAR,
     is_title_inflated    BOOLEAN,
     inflation_reasoning  VARCHAR,
-    extracted_tech_stack VARIANT,
-    stack_category       VARCHAR,
+    role_archetype       VARCHAR,
+    work_focus           VARCHAR,
+    tech_stack_required  VARIANT,
+    tech_stack_preferred VARIANT,
+    paradigms_required   VARIANT,
+    paradigms_preferred  VARIANT,
+    degree_requirement   VARCHAR,
+    years_required_min   INTEGER,
+    years_required_max   INTEGER,
+    salary_min           FLOAT,
+    salary_max           FLOAT,
     confidence_score     FLOAT,
     enriched_at          TIMESTAMP_TZ,
     model_version        VARCHAR
 );
+
+-- Note: analytics_dev and analytics_prod need no table
+-- definitions — dbt creates and manages all tables there
+-- automatically on each run.
+
+---------------------------------------------------------
+-- STEP 6: Grants
+-- Safe to run all together once databases exist.
+---------------------------------------------------------
+GRANT ALL PRIVILEGES ON DATABASE raw              TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON DATABASE enriched         TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON DATABASE analytics_dev    TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON DATABASE analytics_prod   TO ROLE SYSADMIN;
+
+GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE raw              TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE enriched         TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE analytics_dev    TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE analytics_prod   TO ROLE SYSADMIN;
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN DATABASE raw               TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON ALL TABLES IN DATABASE enriched          TO ROLE SYSADMIN;
+
+-- Original version to create the warehouse and raw database tables
 
 -- ---------------------------------------------------------
 -- -- NYC JOB MARKET TRACKER: INGESTION LAYER SETUP RUNBOOK

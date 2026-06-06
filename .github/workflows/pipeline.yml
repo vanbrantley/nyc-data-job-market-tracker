@@ -53,3 +53,38 @@ jobs:
           OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
           PYTHONPATH:          ${{ github.workspace }}
         run: python enrichment/run_enrichment.py
+
+      - name: Install dbt dependencies
+        run: pip install dbt-snowflake
+
+      - name: Create dbt profiles.yml
+        env:
+          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << EOF
+          nyc_job_tracker:
+            target: prod
+            outputs:
+              prod:
+                type: snowflake
+                account: ${SNOWFLAKE_ACCOUNT}
+                user: ${SNOWFLAKE_USER}
+                password: ${SNOWFLAKE_PASSWORD}
+                role: ${SNOWFLAKE_ROLE}
+                warehouse: ${SNOWFLAKE_WAREHOUSE}
+                database: ANALYTICS_PROD
+                schema: public
+                threads: 4
+          EOF
+
+      - name: Run dbt transformations
+        working-directory: transformation
+        run: |
+          dbt deps
+          dbt run
+          dbt test
