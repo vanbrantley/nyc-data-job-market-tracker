@@ -9,6 +9,7 @@ import os
 import json
 import pandas as pd
 import streamlit as st
+from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from data_loader import load_fct_job_postings, format_salary
@@ -26,11 +27,30 @@ st.caption(
 with st.sidebar:
     st.markdown("### Filters")
 
+    # Tech stacks
+    tech_counts = Counter(
+        t for row in df_full["tech_stack_required"] + df_full["tech_stack_preferred"]
+        if isinstance(row, list)
+        for t in row
+        if isinstance(t, str)
+    )
+    all_techs = [tech for tech, _ in tech_counts.most_common()]
+    sel_techs = st.multiselect(
+        "Tech Stack",
+        options=all_techs,
+        default=[],
+        placeholder="Any technology",
+    )
+
     # Role archetype
-    archetypes = sorted(df_full["role_archetype"].dropna().unique().tolist())
+    def fmt_snake_case(val: str) -> str:
+        return val.replace("_", " ") if val else val
+
+    raw_archetypes = sorted(df_full["role_archetype"].dropna().unique().tolist())
     sel_archetypes = st.multiselect(
         "Role Archetype",
-        options=archetypes,
+        options=raw_archetypes,
+        format_func=fmt_snake_case,
         default=[],
         placeholder="All archetypes",
     )
@@ -54,12 +74,29 @@ with st.sidebar:
     )
 
     # Source
+    def fmt_source(val: str) -> str:
+        overrides = {
+            "builtin": "Built In NYC",
+            "jsearch": "JSearch",
+            "theirstack": "TheirStack",
+        }
+        return overrides.get(val, val) if val else val
     sources = sorted(df_full["source"].dropna().unique().tolist())
     sel_sources = st.multiselect(
         "Source",
         options=sources,
+        format_func=fmt_source,
         default=[],
         placeholder="All sources",
+    )
+
+    degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
+    sel_degrees = st.multiselect(
+        "Degree Requirement",
+        options=degree_opts,
+        format_func=fmt_snake_case,
+        default=[],
+        placeholder="Any requirement",
     )
 
     # Salary slider — only over rows that have salary data
@@ -90,12 +127,6 @@ with st.sidebar:
     else:
         date_range = None
 
-    # Tech stack search
-    tech_search = st.text_input(
-        "Tech Stack Contains",
-        placeholder="e.g. dbt, Python, Snowflake",
-    ).strip().lower()
-
     # Title search
     title_search = st.text_input(
         "Search Title / Company",
@@ -106,7 +137,11 @@ with st.sidebar:
     show_inflated_only = st.checkbox("Show inflated titles only")
 
     st.divider()
+    # if st.button("Clear all filters", use_container_width=True):
+    #     st.rerun()
     if st.button("Clear all filters", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
 
 # ── Apply filters ─────────────────────────────────────────────────────────────
@@ -120,14 +155,20 @@ if sel_emp_types:
     df = df[df["employment_type"].isin(sel_emp_types)]
 if sel_sources:
     df = df[df["source"].isin(sel_sources)]
+if sel_degrees:
+    df = df[df["degree_requirement"].isin(sel_degrees)]
 
 # Salary filter — only restrict rows that have salary data; pass through nulls
-has_salary = df["final_salary_min"].notna() & df["final_salary_max"].notna()
-in_salary_range = (
-    (df["final_salary_min"] >= salary_range[0]) &
-    (df["final_salary_max"] <= salary_range[1])
+salary_filter_active = (
+    salary_range[0] > sal_min_overall or salary_range[1] < sal_max_overall
 )
-df = df[~has_salary | in_salary_range]
+if salary_filter_active:
+    has_salary = df["final_salary_min"].notna() & df["final_salary_max"].notna()
+    in_salary_range = (
+        (df["final_salary_min"] >= salary_range[0]) &
+        (df["final_salary_max"] <= salary_range[1])
+    )
+    df = df[~has_salary | in_salary_range]
 
 # Date filter
 if date_range and len(date_range) == 2:
@@ -138,11 +179,11 @@ if date_range and len(date_range) == 2:
     )]
 
 # Tech stack filter
-if tech_search:
-    def has_tech(row):
+if sel_techs:
+    def has_selected_tech(row):
         combined = (row.get("tech_stack_required") or []) + (row.get("tech_stack_preferred") or [])
-        return any(tech_search in t.lower() for t in combined if isinstance(t, str))
-    df = df[df.apply(has_tech, axis=1)]
+        return any(t in sel_techs for t in combined if isinstance(t, str))
+    df = df[df.apply(has_selected_tech, axis=1)]
 
 # Title / company search
 if title_search:
@@ -175,14 +216,15 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     display = pd.DataFrame()
     display["Title"] = df["job_title"].fillna("—")
     display["Company"] = df["company_name"].fillna("—")
-    display["Archetype"] = df["role_archetype"].fillna("—")
+    display["Archetype"] = df["role_archetype"].apply(
+        lambda x: x.replace("_", " ") if pd.notna(x) and x else "—"
+    )
     display["Work Model"] = df["work_model"].fillna("—")
-    display["Source"] = df["source"].fillna("—")
+    display["Source"] = df["source"].apply(lambda x: fmt_source(x) if pd.notna(x) else "—")
     display["Salary"] = df.apply(
         lambda r: format_salary(r["final_salary_min"], r["final_salary_max"]), axis=1
     )
     display["Posted"] = df["date_posted"].dt.strftime("%b %d, %Y").fillna("—")
-    display["⚠️"] = df["is_title_inflated"].apply(lambda x: "🚩" if x else "")
     # Keep job_id as hidden key for row linking
     display["_job_id"] = df["job_id"].values
     display["_idx"] = df.index.values
@@ -192,7 +234,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
 display_df = make_display_df(df)
 
 # Show grid — hide _job_id and _idx from column display
-visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "Salary", "Posted", "⚠️"]
+visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "Salary", "Posted"]
 
 # Selection via selectbox (simpler and reliable across Streamlit versions)
 st.markdown("#### Postings")
@@ -264,7 +306,7 @@ with col_left:
     meta_html = (
         f'<span class="tag-pill {wm_color}">{job.get("work_model", "—")}</span>'
         f'<span class="tag-pill {et_color}">{str(job.get("employment_type","—")).replace("_"," ")}</span>'
-        f'<span class="tag-pill {src_color}">{job.get("source","—")}</span>'
+        f'<span class="tag-pill {src_color}">{fmt_source(job.get("source","—"))}</span>'
     )
     st.markdown(meta_html, unsafe_allow_html=True)
 
