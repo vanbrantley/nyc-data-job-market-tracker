@@ -14,10 +14,10 @@ class JobEnrichmentSchema(BaseModel):
         "software_engineer",
     ]
     work_focus: str
-    tech_stack_required: List[str]
-    tech_stack_preferred: List[str]
-    paradigms_required: List[str]
-    paradigms_preferred: List[str]
+    tech_stack_required: List[str] = []
+    tech_stack_preferred: List[str] = []
+    paradigms_required: List[str] = []
+    paradigms_preferred: List[str] = []
     degree_requirement: Literal["none", "bachelors", "masters", "equivalent_ok"]
     years_required_min: Optional[int] = None
     years_required_max: Optional[int] = None
