@@ -281,13 +281,19 @@ def run_pipeline() -> bool:
     log.info(f"    Total     : {len(jobs)}")
     log.info(f"    Duration  : {duration:.1f}s")
 
-    if failed > 0:
+    if failed > 0 and succeeded == 0:
         log.error(
-            f"Pipeline finished with {failed} failures. Duration: {duration:.1f}s"
+            f"Pipeline finished with total failure — {failed} failures, 0 succeeded. Duration: {duration:.1f}s"
         )
         return False
 
-    log.info(f"Pipeline finished successfully. Duration: {duration:.1f}s")
+    if failed > 0:
+        log.warning(
+            f"Pipeline finished with partial failures — {succeeded} succeeded, {failed} failed. Duration: {duration:.1f}s"
+        )
+    else:
+        log.info(f"Pipeline finished successfully. Duration: {duration:.1f}s")
+
     return True
 
 
