@@ -24,8 +24,35 @@ st.caption(
 )
 
 # ── Sidebar filters ───────────────────────────────────────────────────────────
+FILTER_KEYS = [
+    "filter_techs", "filter_archetypes", "filter_work_models",
+    "filter_emp_types", "filter_sources", "filter_degrees",
+    "filter_salary", "filter_dates", "filter_title", "filter_inflated"
+]
+
+# Compute these before the sidebar so pending_clear can reference them
+salary_df = df_full.dropna(subset=["final_salary_min", "final_salary_max"])
+sal_min_overall = int(salary_df["final_salary_min"].min()) if len(salary_df) else 0
+sal_max_overall = min(int(salary_df["final_salary_max"].max()), 300_000) if len(salary_df) else 300_000
+date_min = df_full["date_posted"].min().date() if df_full["date_posted"].notna().any() else None
+date_max = df_full["date_posted"].max().date() if df_full["date_posted"].notna().any() else None
+
 with st.sidebar:
     st.markdown("### Filters")
+
+    # Reset all filter widgets to defaults on the run after clear is clicked
+    if st.session_state.get("pending_clear"):
+        st.session_state["filter_techs"] = []
+        st.session_state["filter_archetypes"] = []
+        st.session_state["filter_work_models"] = []
+        st.session_state["filter_emp_types"] = []
+        st.session_state["filter_sources"] = []
+        st.session_state["filter_degrees"] = []
+        st.session_state["filter_salary"] = (sal_min_overall, sal_max_overall)
+        st.session_state["filter_dates"] = (date_min, date_max)
+        st.session_state["filter_title"] = ""
+        st.session_state["filter_inflated"] = False
+        st.session_state["pending_clear"] = False
 
     # Tech stacks
     tech_counts = Counter(
@@ -40,6 +67,7 @@ with st.sidebar:
         options=all_techs,
         default=[],
         placeholder="Any technology",
+        key="filter_techs"
     )
 
     # Role archetype
@@ -53,6 +81,7 @@ with st.sidebar:
         format_func=fmt_snake_case,
         default=[],
         placeholder="All archetypes",
+        key="filter_archetypes"
     )
 
     # Work model
@@ -62,6 +91,7 @@ with st.sidebar:
         options=work_models,
         default=[],
         placeholder="All models",
+        key="filter_work_models"
     )
 
     # Employment type
@@ -71,6 +101,7 @@ with st.sidebar:
         options=emp_types,
         default=[],
         placeholder="All types",
+        key="filter_emp_types"
     )
 
     # Source
@@ -88,6 +119,7 @@ with st.sidebar:
         format_func=fmt_source,
         default=[],
         placeholder="All sources",
+        key="filter_sources"
     )
 
     degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
@@ -97,14 +129,10 @@ with st.sidebar:
         format_func=fmt_snake_case,
         default=[],
         placeholder="Any requirement",
+        key="filter_degrees"
     )
 
     # Salary slider — only over rows that have salary data
-    salary_df = df_full.dropna(subset=["final_salary_min", "final_salary_max"])
-    # Cap at 300k to avoid outlier distortion on the slider
-    sal_min_overall = int(salary_df["final_salary_min"].min()) if len(salary_df) else 0
-    sal_max_overall = min(int(salary_df["final_salary_max"].max()), 300_000) if len(salary_df) else 300_000
-
     salary_range = st.slider(
         "Salary Range (where disclosed)",
         min_value=sal_min_overall,
@@ -112,17 +140,17 @@ with st.sidebar:
         value=(sal_min_overall, sal_max_overall),
         step=5_000,
         format="$%d",
+        key="filter_salary"
     )
 
     # Date posted range
     if df_full["date_posted"].notna().any():
-        date_min = df_full["date_posted"].min().date()
-        date_max = df_full["date_posted"].max().date()
         date_range = st.date_input(
             "Date Posted",
             value=(date_min, date_max),
             min_value=date_min,
             max_value=date_max,
+            key="filter_dates"
         )
     else:
         date_range = None
@@ -131,17 +159,18 @@ with st.sidebar:
     title_search = st.text_input(
         "Search Title / Company",
         placeholder="e.g. analyst, Stripe",
+        key="filter_title"
     ).strip().lower()
 
     # Title inflation flag
-    show_inflated_only = st.checkbox("Show inflated titles only")
+    show_inflated_only = st.checkbox(
+        "Show inflated titles only",
+        key="filter_inflated"
+    )
 
     st.divider()
-    # if st.button("Clear all filters", use_container_width=True):
-    #     st.rerun()
     if st.button("Clear all filters", use_container_width=True):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        st.session_state["pending_clear"] = True
         st.rerun()
 
 # ── Apply filters ─────────────────────────────────────────────────────────────
@@ -221,9 +250,11 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     display["Work Model"] = df["work_model"].fillna("—")
     display["Source"] = df["source"].apply(lambda x: fmt_source(x) if pd.notna(x) else "—")
-    display["Salary"] = df.apply(
-        lambda r: format_salary(r["final_salary_min"], r["final_salary_max"]), axis=1
-    )
+    # display["Salary"] = df.apply(
+    #     lambda r: format_salary(r["final_salary_min"], r["final_salary_max"]), axis=1
+    # )
+    display["sal_min"] = df["final_salary_min"].values
+    display["sal_max"] = df["final_salary_max"].values
     display["Posted"] = df["date_posted"].dt.strftime("%b %d, %Y").fillna("—")
     # Keep job_id as hidden key for row linking
     display["_job_id"] = df["job_id"].values
@@ -234,35 +265,59 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
 display_df = make_display_df(df)
 
 # Show grid — hide _job_id and _idx from column display
-visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "Salary", "Posted"]
+visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "sal_min", "sal_max", "Posted"]
 
-# Selection via selectbox (simpler and reliable across Streamlit versions)
 st.markdown("#### Postings")
 
+# When the filtered row count changes (i.e. a filter was added/removed/changed),
+# reset the tracked count and increment df_key. Incrementing df_key forces a new
+# widget key on the next render, which Streamlit treats as a brand new widget —
+# discarding any existing internal selection state from the previous filter state.
+if "last_filtered_count" not in st.session_state or st.session_state["last_filtered_count"] != len(df):
+    st.session_state["last_filtered_count"] = len(df)
+    st.session_state["df_key"] = st.session_state.get("df_key", 0) + 1
+
+# Initialize df_key on very first load before any filter changes have occurred
+if "df_key" not in st.session_state:
+    st.session_state["df_key"] = 0
+
+# Build the widget key string for this render. Each time df_key increments,
+# current_key becomes a string Streamlit has never seen before (e.g. "row_selection_2"),
+# meaning it has no existing internal widget state to override our pre-seeded value.
+current_key = f"row_selection_{st.session_state['df_key']}"
+
+# Pre-seed the session state for current_key BEFORE the widget renders.
+# This only runs when current_key is new (i.e. after a filter change or on first load).
+# Streamlit reads this value as the initial selection since the widget is brand new.
+# For already-registered widget keys, Streamlit ignores session state and uses its
+# own internal state — which is why the key has to be fresh for this to work.
+if current_key not in st.session_state:
+    st.session_state[current_key] = {"selection": {"rows": [0], "columns": [], "cells": []}}
+
 # Render the display table
-st.dataframe(
+event = st.dataframe(
     display_df[visible_cols].reset_index(drop=True),
     use_container_width=True,
     hide_index=True,
     height=320,
+    on_select="rerun",
+    selection_mode="single-row",
+    key=current_key,  # ties this widget to the pre-seeded session state entry above
+    column_config={
+        "sal_min": st.column_config.NumberColumn("Sal. Min", format="$%d"),
+        "sal_max": st.column_config.NumberColumn("Sal. Max", format="$%d"),
+    }
 )
 
-# Row selector
-st.markdown("#### Inspect a Posting")
-row_labels = [
-    f"{i+1}. {row['Title']} @ {row['Company']}"
-    for i, row in display_df[visible_cols].iterrows()
-]
-selected_label = st.selectbox(
-    "Select a posting to inspect",
-    options=row_labels,
-    index=0,
-    label_visibility="collapsed",
-)
-selected_pos = row_labels.index(selected_label)
+# Unpack the selected row index from the event object.
+# Falls back to 0 if nothing is selected (should only happen transiently).
+selected_rows = event.selection.rows if event and event.selection else []
+selected_pos = selected_rows[0] if selected_rows else 0
+
+# Look up the job_id for the selected row, then fetch the full row from df.
+# We go through job_id rather than using selected_pos directly on df to stay
+# robust against index misalignment between display_df and the filtered df.
 selected_job_id = display_df.iloc[selected_pos]["_job_id"]
-
-# Fetch the full row from the original df
 job = df[df["job_id"] == selected_job_id].iloc[0]
 
 # ── Detail panel ──────────────────────────────────────────────────────────────
@@ -312,18 +367,36 @@ with col_left:
 
     st.markdown("")
 
-    # Quick stats grid
-    qc1, qc2, qc3 = st.columns(3)
-    with qc1:
-        st.metric("Salary", format_salary(job.get("final_salary_min"), job.get("final_salary_max")))
-    with qc2:
+    # # Quick stats grid
+    # qc1, qc2, qc3 = st.columns(3)
+    # with qc1:
+    #     st.metric("Salary", format_salary(job.get("final_salary_min"), job.get("final_salary_max")))
+    # with qc2:
+    #     posted = job.get("date_posted")
+    #     st.metric("Posted", posted.strftime("%b %d, %Y") if pd.notna(posted) else "—")
+    # with qc3:
+    #     city = job.get("city")
+    #     state = job.get("state")
+    #     location = f"{city}, {state}" if city and state else (city or state or "Remote / Unknown")
+    #     st.metric("Location", location)
+
+    info_col1, info_col2 = st.columns(2)
+    with info_col1:
         posted = job.get("date_posted")
-        st.metric("Posted", posted.strftime("%b %d, %Y") if pd.notna(posted) else "—")
-    with qc3:
-        city = job.get("city")
-        state = job.get("state")
-        location = f"{city}, {state}" if city and state else (city or state or "Remote / Unknown")
-        st.metric("Location", location)
+        st.markdown(f"**📅 Posted:** {posted.strftime('%b %d, %Y') if pd.notna(posted) else '—'}")
+        st.markdown(f"**💰 Salary:** {format_salary(job.get('final_salary_min'), job.get('final_salary_max')).replace('$', '＄')}")
+    with info_col2:
+        city = job.get("city") if pd.notna(job.get("city")) else None
+        state = job.get("state") if pd.notna(job.get("state")) else None
+        if city and state:
+            location = f"{city}, {state}"
+        elif city or state:
+            location = city or state
+        elif str(job.get("work_model", "")).lower() == "remote":
+            location = "Remote"
+        else:
+            location = "Unknown"
+        st.markdown(f"**📍 Location:** {location}")
 
     st.markdown("")
 

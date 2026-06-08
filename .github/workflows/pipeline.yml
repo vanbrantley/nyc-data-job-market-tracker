@@ -2,7 +2,7 @@ name: NYC Job Market — Data Pipeline
 
 on:
   schedule:
-    - cron: "0 9 * * 1,4"  # 9am UTC every Monday and Thursday (~every 3 days)
+    - cron: "14 10 * * 1,4"  # 10am UTC (6am EDT) every Monday and Thursday (~every 3 days)
   workflow_dispatch:         # allow manual trigger from GitHub UI for testing
 
 jobs:

@@ -108,11 +108,11 @@ def format_salary(min_val, max_val) -> str:
         if pd.isna(v):
             return None
         v = int(v)
-        return f"${v:,}"
+        return f"＄{v:,}"  # unicode fullwidth dollar sign ＄ (U+FF04)
 
     lo, hi = fmt(min_val), fmt(max_val)
     if lo and hi:
-        return f"{lo} – {hi}"
+        return f"{lo} - {hi}"
     if lo:
         return f"{lo}+"
     if hi:
