@@ -181,7 +181,7 @@ class SnowflakeLoader:
                     run_id, run_at, duration_seconds, status,
                     jsearch_rows, theirstack_rows, builtin_rows, total_rows
                 )
-                VALUES (%s, %s::TIMESTAMP_TZ, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s::TIMESTAMP_NTZ, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     run_id,
@@ -220,7 +220,7 @@ class SnowflakeLoader:
                     run_id, run_at, source, credits_remaining,
                     credits_limit, credits_used, reset_date
                 )
-                VALUES (%s, %s::TIMESTAMP_TZ, %s, %s, %s, %s, %s)
+                VALUES (%s, %s::TIMESTAMP_NTZ, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
