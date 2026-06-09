@@ -1,6 +1,7 @@
 with source as (
 
     select
+        SOURCE,
         RAW_PAYLOAD,
         INGESTED_AT
     from {{ source('builtin', 'src_postings') }}
@@ -11,7 +12,8 @@ extracted as (
 
     select
         RAW_PAYLOAD:identifier:value::STRING                        as job_id,
-        'builtin'                                                   as source,
+        SPLIT_PART(SOURCE, ':', 1)                                  as source,
+        NULLIF(SPLIT_PART(SOURCE, ':', 2), '')                      as ingestion_query,
         RAW_PAYLOAD:title::STRING                                   as job_title,
         RAW_PAYLOAD:hiringOrganization:name::STRING                 as company_name,
         RAW_PAYLOAD:source_url::STRING                              as job_url,

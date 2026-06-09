@@ -64,6 +64,7 @@ joined as (
     select
         j.job_id,
         j.source,
+        j.ingestion_query,
         j.job_title,
         j.company_name,
         j.job_url,

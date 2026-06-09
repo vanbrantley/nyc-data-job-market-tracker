@@ -5,6 +5,7 @@ with int_jobs as (
 select
     job_id,
     source,
+    ingestion_query,
     job_title,
     company_name,
     job_url,

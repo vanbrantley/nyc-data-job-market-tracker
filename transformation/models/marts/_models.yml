@@ -20,6 +20,12 @@ models:
           - accepted_values:
               values: ['jsearch', 'theirstack', 'builtin']
 
+      - name: ingestion_query
+        description: >
+          The specific query label that produced this row (e.g. "Data Analyst",
+          "Analytics Engineer", "Data Engineer"). Null for rows ingested before
+          query-level tracking was added.
+
       - name: job_title
         description: Job title as posted by the employer.
         tests:

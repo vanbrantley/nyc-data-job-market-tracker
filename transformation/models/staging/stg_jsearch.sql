@@ -1,6 +1,7 @@
 with source as (
 
     select
+        SOURCE,
         RAW_PAYLOAD,
         INGESTED_AT
     from {{ source('jsearch', 'src_postings') }}
@@ -11,7 +12,8 @@ extracted as (
 
     select
         RAW_PAYLOAD:job_id::STRING                                  as job_id,
-        'jsearch'                                                   as source,
+        SPLIT_PART(SOURCE, ':', 1)                                  as source,
+        NULLIF(SPLIT_PART(SOURCE, ':', 2), '')                      as ingestion_query,
         RAW_PAYLOAD:job_title::STRING                               as job_title,
         RAW_PAYLOAD:employer_name::STRING                           as company_name,
         RAW_PAYLOAD:job_apply_link::STRING                          as job_url,
@@ -75,8 +77,6 @@ filtered as (
             LOWER(job_title),
             '.*(senior|sr\\.?|lead|principal|staff|manager|director|vp|vice president|avp|head of|architect|chief|svp|evp|gvp|president|officer|executive|leader).*'
           )
-    --   -- exclude malformed titles
-    --   and not REGEXP_LIKE(LOWER(job_title), '^(orbis|owner)$')
 
 )
 

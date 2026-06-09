@@ -271,7 +271,7 @@ class JSearchClient:
         """
         return [
             {
-                "SOURCE": f"jsearch:{query}",
+                "SOURCE": f"jsearch:{query.replace(' in New York', '')}",
                 "RAW_PAYLOAD": job,
                 "INGESTED_AT": self._ingested_at,
             }
