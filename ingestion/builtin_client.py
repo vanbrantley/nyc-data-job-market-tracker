@@ -29,9 +29,9 @@ log = logging.getLogger(__name__)
 # Constants
 # ------------------------------------------------------------------ #
 
-SEARCH_URL = (
+BASE_SEARCH_URL = (
     "https://www.builtinnyc.com/jobs/entry-level/junior/mid-level"
-    "?search=Data+Analyst"
+    "?search={search_term}"
     "&daysSinceUpdated=3"
     "&city=New+York+City"
     "&state=New+York"
@@ -83,34 +83,53 @@ class BuiltInNYCScraper:
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
-
-    def fetch_all(self) -> list[dict]:
+    
+    def fetch_all(self, configs: list[dict]) -> list[dict]:
         """
-        Run the full crawl → scrape pipeline.
-        Returns a flat list of Snowflake-ready row dicts.
+        Run the full crawl → scrape pipeline for each search config.
+        Returns a combined flat list of Snowflake-ready row dicts.
         """
-        # Stage 1 — crawl index pages
-        job_records = self._crawl_index()
-        log.info(f"Crawl complete — {len(job_records)} unique job URLs discovered.")
+        all_rows: list[dict] = []
 
-        if not job_records:
-            log.warning("No job URLs found — returning empty list.")
-            return []
+        for config in configs:
+            label = config["label"]
+            search_term = config["search_term"]
+            log.info(f"Starting fetch for config: {label!r}")
+            try:
+                # Stage 1 — crawl index pages
+                search_url = BASE_SEARCH_URL.format(search_term=search_term)
+                job_records = self._crawl_index(search_url=search_url)
+                log.info(
+                    f"  [{label}] Crawl complete — "
+                    f"{len(job_records)} unique job URLs discovered."
+                )
 
-        # Stage 2 — scrape individual job pages
-        scraped = self._scrape_jobs(job_records)
-        log.info(
-            f"Scrape complete — {len(scraped)} succeeded, "
-            f"{len(job_records) - len(scraped)} failed/skipped."
-        )
+                if not job_records:
+                    log.warning(f"  [{label}] No job URLs found — skipping scrape.")
+                    continue
 
-        return self._to_snowflake_rows(scraped)
+                # Stage 2 — scrape individual job pages
+                scraped = self._scrape_jobs(job_records)
+                log.info(
+                    f"  [{label}] Scrape complete — {len(scraped)} succeeded, "
+                    f"{len(job_records) - len(scraped)} failed/skipped."
+                )
+
+                all_rows.extend(self._to_snowflake_rows(scraped, label=label))
+                log.info(f"  [{label}] {len(scraped)} rows added to results.")
+
+            except Exception as e:
+                # One bad config shouldn't abort the others
+                log.error(f"Config {label!r} failed: {e}", exc_info=True)
+
+        log.info(f"fetch_all complete — {len(all_rows)} total rows.")
+        return all_rows
 
     # ------------------------------------------------------------------ #
     # Private helpers
     # ------------------------------------------------------------------ #
 
-    def _crawl_index(self) -> list[dict]:
+    def _crawl_index(self, search_url: str) -> list[dict]:
         """
         Paginate through search index pages and collect job URLs + titles.
         Stops when a page returns no JSON-LD block (past the last real page).
@@ -120,7 +139,7 @@ class BuiltInNYCScraper:
         seen_urls: set[str] = set()
 
         for page_num in range(1, MAX_PAGES + 1):
-            url = SEARCH_URL if page_num == 1 else f"{SEARCH_URL}&page={page_num}"
+            url = search_url if page_num == 1 else f"{search_url}&page={page_num}"
 
             if page_num > 1:
                 delay = random.uniform(MIN_CRAWL_DELAY, MAX_CRAWL_DELAY)
@@ -247,7 +266,7 @@ class BuiltInNYCScraper:
 
         return scraped
 
-    def _to_snowflake_rows(self, scraped: list[dict]) -> list[dict]:
+    def _to_snowflake_rows(self, scraped: list[dict], label: str) -> list[dict]:
         """
         Wrap each scraped job into the standard Snowflake landing row shape.
 
@@ -262,7 +281,7 @@ class BuiltInNYCScraper:
         """
         return [
             {
-                "SOURCE": "builtin",
+                "SOURCE": f"builtin:{label}",
                 "RAW_PAYLOAD": {
                     "source_url": record["source_url"],
                     "crawl_title": record["crawl_title"],

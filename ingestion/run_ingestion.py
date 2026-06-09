@@ -20,6 +20,33 @@ logging.basicConfig(
 )
 log = logging.getLogger("orchestrator")
 
+JSEARCH_QUERIES = [
+    "Data Analyst in New York",
+    "Analytics Engineer in New York",
+    "Data Engineer in New York",
+]
+
+THEIRSTACK_CONFIGS = [
+    {
+        "label": "Data Analyst",
+        "job_title_pattern_or": ["(?i)data analyst"],
+    },
+    {
+        "label": "Analytics Engineer",
+        "job_title_pattern_or": ["(?i)analytics engineer"],
+    },
+    {
+        "label": "Data Engineer",
+        "job_title_pattern_or": ["(?i)data engineer"],
+    },
+]
+
+BUILTIN_CONFIGS = [
+    {"label": "Data Analyst", "search_term": "Data+Analyst"},
+    {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
+    {"label": "Data Engineer", "search_term": "Data+Engineer"},
+]
+
 
 def run_pipeline() -> bool:
     """
@@ -48,11 +75,7 @@ def run_pipeline() -> bool:
         # ------------------------------------------------------------------ #
         try:
             results["jsearch"] = jsearch_client.fetch_all(
-                queries=[
-                    "Data Analyst in New York",
-                    "Analytics Engineer in New York",
-                    "Data Engineer in New York",
-                ],
+                queries=JSEARCH_QUERIES,
                 date_posted="3days",
             )
             log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
@@ -85,7 +108,8 @@ def run_pipeline() -> bool:
                 )
 
             results["theirstack"] = theirstack_client.fetch_all(
-                discovered_at_gte=discovered_at_gte
+                configs=THEIRSTACK_CONFIGS,
+                discovered_at_gte=discovered_at_gte,
             )
             log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
         except Exception as e:
@@ -107,7 +131,7 @@ def run_pipeline() -> bool:
         # 3. Built In NYC — collect then immediately load
         # ------------------------------------------------------------------ #
         try:
-            results["builtin"] = builtin_scraper.fetch_all()
+            results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
             log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
         except Exception as e:
             log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
@@ -125,7 +149,7 @@ def run_pipeline() -> bool:
             failures.append("builtin_snowflake")
 
     # ------------------------------------------------------------------ #
-    # 5. Run summary
+    # 4. Run summary
     # ------------------------------------------------------------------ #
     duration = (datetime.now(timezone.utc) - run_start).total_seconds()
 
