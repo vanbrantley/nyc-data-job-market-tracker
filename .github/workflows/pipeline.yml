@@ -42,17 +42,17 @@ jobs:
           PYTHONPATH:          ${{ github.workspace }}
         run: python ingestion/run_ingestion.py
 
-      - name: Run enrichment
-        env:
-          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
-          OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
-          PYTHONPATH:          ${{ github.workspace }}
-        run: python enrichment/run_enrichment.py
+      # - name: Run enrichment
+      #   env:
+      #     SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      #     SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+      #     SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      #     SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
+      #     SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      #     SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+      #     OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
+      #     PYTHONPATH:          ${{ github.workspace }}
+      #   run: python enrichment/run_enrichment.py
 
       - name: Install dbt dependencies
         run: pip install dbt-snowflake

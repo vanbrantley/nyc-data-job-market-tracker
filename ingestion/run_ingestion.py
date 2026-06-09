@@ -6,7 +6,7 @@
 
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from ingestion.jsearch_client import JSearchClient
 from ingestion.theirstack_client import TheirStackClient
@@ -69,101 +69,132 @@ def run_pipeline() -> bool:
     }
     failures: list[str] = []
 
-    with SnowflakeLoader() as loader:
-        # ------------------------------------------------------------------ #
-        # 1. JSearch — collect then immediately load
-        # ------------------------------------------------------------------ #
-        try:
-            results["jsearch"] = jsearch_client.fetch_all(
-                queries=JSEARCH_QUERIES,
-                date_posted="3days",
-            )
-            log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
-        except Exception as e:
-            log.error(f"JSearch source FAILED: {e}", exc_info=True)
-            failures.append("jsearch")
+    # with SnowflakeLoader() as loader:
+    #     # ------------------------------------------------------------------ #
+    #     # 1. JSearch — collect then immediately load
+    #     # ------------------------------------------------------------------ #
+    #     try:
+    #         results["jsearch"] = jsearch_client.fetch_all(
+    #             queries=JSEARCH_QUERIES,
+    #             date_posted="3days",
+    #         )
+    #         log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
+    #     except Exception as e:
+    #         log.error(f"JSearch source FAILED: {e}", exc_info=True)
+    #         failures.append("jsearch")
 
-        try:
-            if results["jsearch"]:
-                load_results = loader.load(results["jsearch"])
-                for table, count in load_results.items():
-                    log.info(f"  {table}: {count} rows inserted.")
-            else:
-                log.warning("JSearch — no rows to load, skipping Snowflake write.")
-        except Exception as e:
-            log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
-            failures.append("jsearch_snowflake")
+    #     try:
+    #         if results["jsearch"]:
+    #             load_results = loader.load(results["jsearch"])
+    #             for table, count in load_results.items():
+    #                 log.info(f"  {table}: {count} rows inserted.")
+    #         else:
+    #             log.warning("JSearch — no rows to load, skipping Snowflake write.")
+    #     except Exception as e:
+    #         log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
+    #         failures.append("jsearch_snowflake")
 
-        # ------------------------------------------------------------------ #
-        # 2. TheirStack — collect then immediately load
-        # ------------------------------------------------------------------ #
-        try:
-            discovered_at_gte = None
-            try:
-                discovered_at_gte = loader.get_theirstack_high_water_mark()
-            except Exception as e:
-                log.warning(
-                    f"Could not fetch TheirStack high-water mark: {e}. "
-                    f"Falling back to full 7-day window."
-                )
+    #     # ------------------------------------------------------------------ #
+    #     # 2. TheirStack — collect then immediately load
+    #     # ------------------------------------------------------------------ #
+    #     try:
+    #         discovered_at_gte = None
+    #         try:
+    #             discovered_at_gte = loader.get_theirstack_high_water_mark()
+    #         except Exception as e:
+    #             log.warning(
+    #                 f"Could not fetch TheirStack high-water mark: {e}. "
+    #                 f"Falling back to full 7-day window."
+    #             )
 
-            results["theirstack"] = theirstack_client.fetch_all(
-                configs=THEIRSTACK_CONFIGS,
-                discovered_at_gte=discovered_at_gte,
-            )
-            log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
-        except Exception as e:
-            log.error(f"TheirStack source FAILED: {e}", exc_info=True)
-            failures.append("theirstack")
+    #         results["theirstack"] = theirstack_client.fetch_all(
+    #             configs=THEIRSTACK_CONFIGS,
+    #             discovered_at_gte=discovered_at_gte,
+    #         )
+    #         log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
+    #     except Exception as e:
+    #         log.error(f"TheirStack source FAILED: {e}", exc_info=True)
+    #         failures.append("theirstack")
 
-        try:
-            if results["theirstack"]:
-                load_results = loader.load(results["theirstack"])
-                for table, count in load_results.items():
-                    log.info(f"  {table}: {count} rows inserted.")
-            else:
-                log.warning("TheirStack — no rows to load, skipping Snowflake write.")
-        except Exception as e:
-            log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
-            failures.append("theirstack_snowflake")
+    #     try:
+    #         if results["theirstack"]:
+    #             load_results = loader.load(results["theirstack"])
+    #             for table, count in load_results.items():
+    #                 log.info(f"  {table}: {count} rows inserted.")
+    #         else:
+    #             log.warning("TheirStack — no rows to load, skipping Snowflake write.")
+    #     except Exception as e:
+    #         log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
+    #         failures.append("theirstack_snowflake")
 
-        # ------------------------------------------------------------------ #
-        # 3. Built In NYC — collect then immediately load
-        # ------------------------------------------------------------------ #
-        try:
-            results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
-            log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
-        except Exception as e:
-            log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
-            failures.append("builtin")
+    #     # ------------------------------------------------------------------ #
+    #     # 3. Built In NYC — collect then immediately load
+    #     # ------------------------------------------------------------------ #
+    #     try:
+    #         results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
+    #         log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
+    #     except Exception as e:
+    #         log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
+    #         failures.append("builtin")
 
-        try:
-            if results["builtin"]:
-                load_results = loader.load(results["builtin"])
-                for table, count in load_results.items():
-                    log.info(f"  {table}: {count} rows inserted.")
-            else:
-                log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
-        except Exception as e:
-            log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
-            failures.append("builtin_snowflake")
+    #     try:
+    #         if results["builtin"]:
+    #             load_results = loader.load(results["builtin"])
+    #             for table, count in load_results.items():
+    #                 log.info(f"  {table}: {count} rows inserted.")
+    #         else:
+    #             log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
+    #     except Exception as e:
+    #         log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
+    #         failures.append("builtin_snowflake")
 
     # ------------------------------------------------------------------ #
     # 4. Run summary
     # ------------------------------------------------------------------ #
     duration = (datetime.now(timezone.utc) - run_start).total_seconds()
 
+    jsearch_count = len(results["jsearch"]) if results["jsearch"] else 0
+    theirstack_count = len(results["theirstack"]) if results["theirstack"] else 0
+    builtin_count = len(results["builtin"]) if results["builtin"] else 0
+    total_count = jsearch_count + theirstack_count + builtin_count
+
+    # Determine run status
+    if failures and total_count == 0:
+        status = "failure"
+    elif failures:
+        status = "partial"
+    else:
+        status = "success"
+
+    # Use run_start as run_id — ISO timestamp is unique per run
+    run_id = run_start.isoformat()
+
     # API usage / credit stats — failures here must never affect the exit code.
+    api_usage_rows = []
+
     try:
         js = jsearch_client.get_usage_stats()
         if js:
-            remaining = js.get("requests_remaining", "?")
-            limit = js.get("requests_limit", "?")
-            reset = js.get("requests_reset", "?")
+            remaining = js.get("requests_remaining")
+            limit = js.get("requests_limit")
+            reset_seconds = js.get("requests_reset")
+            reset_date = (
+                (run_start + timedelta(seconds=int(reset_seconds))).isoformat()
+                if reset_seconds else None
+            )
             log.info(
                 f"JSearch    — {remaining} of {limit} requests remaining "
-                f"(resets in {reset}s)"
+                f"(resets in {reset_seconds}s)"
             )
+            api_usage_rows.append({
+                "run_id": run_id,
+                "run_at": run_start,
+                "source": "jsearch",
+                "credits_remaining": int(remaining) if remaining else None,
+                "credits_limit": int(limit) if limit else None,
+                "credits_used": (int(limit) - int(remaining)) if (limit and remaining) else None,
+                "reset_date": reset_date,
+            })
         else:
             log.info("JSearch    — no usage stats available (no requests made).")
     except Exception as e:
@@ -171,29 +202,53 @@ def run_pipeline() -> bool:
 
     try:
         ts = theirstack_client.get_usage_stats()
-        total = ts.get("api_credits", "?")
-        used = ts.get("used_api_credits", "?")
+        total = ts.get("api_credits")
+        used = ts.get("used_api_credits")
         remaining = (
             int(total) - int(used)
             if isinstance(total, int) and isinstance(used, int)
-            else "?"
+            else None
         )
-        expiry = (ts.get("earliest_expiration") or "")[:10]  # trim to YYYY-MM-DD
+        expiry = (ts.get("earliest_expiration") or "")[:10]
         log.info(
             f"TheirStack — {remaining} of {total} API credits remaining "
             f"({used} used, expires {expiry})"
         )
+        api_usage_rows.append({
+            "run_id": run_id,
+            "run_at": run_start,
+            "source": "theirstack",
+            "credits_remaining": remaining,
+            "credits_limit": int(total) if total else None,
+            "credits_used": int(used) if used else None,
+            "reset_date": expiry or None,
+        })
     except Exception as e:
         log.warning(f"Could not retrieve TheirStack usage stats: {e}")
 
-    jsearch_count = len(results["jsearch"]) if results["jsearch"] else 0
-    theirstack_count = len(results["theirstack"]) if results["theirstack"] else 0
-    builtin_count = len(results["builtin"]) if results["builtin"] else 0
-    total_count = jsearch_count + theirstack_count + builtin_count
     log.info(
         f"Row counts — jsearch: {jsearch_count} | theirstack: {theirstack_count} "
         f"| builtin: {builtin_count} | total: {total_count}"
     )
+
+    # Write pipeline tracking to Snowflake — never affects exit code
+    try:
+        with SnowflakeLoader() as tracking_loader:
+            tracking_loader.write_pipeline_run(
+                run_id=run_id,
+                run_at=run_start,
+                duration_seconds=duration,
+                status=status,
+                jsearch_rows=jsearch_count,
+                theirstack_rows=theirstack_count,
+                builtin_rows=builtin_count,
+                total_rows=total_count,
+            )
+            if api_usage_rows:
+                tracking_loader.write_api_usage(api_usage_rows)
+        log.info("Pipeline tracking written to Snowflake.")
+    except Exception as e:
+        log.warning(f"Could not write pipeline tracking to Snowflake: {e}")
 
     if failures:
         log.error(

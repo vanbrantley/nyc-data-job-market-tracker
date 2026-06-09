@@ -117,6 +117,35 @@ GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE analytics_prod   TO ROLE SYSADMI
 GRANT ALL PRIVILEGES ON ALL TABLES IN DATABASE raw               TO ROLE SYSADMIN;
 GRANT ALL PRIVILEGES ON ALL TABLES IN DATABASE enriched          TO ROLE SYSADMIN;
 
+---------------------------------------------------------
+-- STEP 7: Create pipeline tracking tables
+---------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS raw.pipeline;
+
+CREATE TABLE IF NOT EXISTS raw.pipeline.runs (
+    run_id              VARCHAR         NOT NULL,
+    run_at              TIMESTAMP_TZ    NOT NULL,
+    duration_seconds    FLOAT,
+    status              VARCHAR,
+    jsearch_rows        INTEGER,
+    theirstack_rows     INTEGER,
+    builtin_rows        INTEGER,
+    total_rows          INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS raw.pipeline.api_usage (
+    run_id              VARCHAR         NOT NULL,
+    run_at              TIMESTAMP_TZ    NOT NULL,
+    source              VARCHAR         NOT NULL,
+    credits_remaining   INTEGER,
+    credits_limit       INTEGER,
+    credits_used        INTEGER,
+    reset_date          VARCHAR
+);
+
+GRANT ALL PRIVILEGES ON SCHEMA raw.pipeline TO ROLE SYSADMIN;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA raw.pipeline TO ROLE SYSADMIN;
+
 -- Original version to create the warehouse and raw database tables
 
 -- ---------------------------------------------------------

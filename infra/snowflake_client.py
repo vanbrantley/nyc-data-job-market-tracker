@@ -159,6 +159,91 @@ class SnowflakeLoader:
         finally:
             cur.close()
 
+    def write_pipeline_run(
+        self,
+        run_id: str,
+        run_at,
+        duration_seconds: float,
+        status: str,
+        jsearch_rows: int,
+        theirstack_rows: int,
+        builtin_rows: int,
+        total_rows: int,
+    ) -> None:
+        """
+        Write a single row to RAW.PIPELINE.RUNS summarizing this pipeline run.
+        """
+        cur = self._conn.cursor()
+        try:
+            cur.execute(
+                """
+                INSERT INTO RAW.PIPELINE.RUNS (
+                    run_id, run_at, duration_seconds, status,
+                    jsearch_rows, theirstack_rows, builtin_rows, total_rows
+                )
+                VALUES (%s, %s::TIMESTAMP_TZ, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    run_id,
+                    run_at.isoformat(),
+                    duration_seconds,
+                    status,
+                    jsearch_rows,
+                    theirstack_rows,
+                    builtin_rows,
+                    total_rows,
+                ),
+            )
+            self._conn.commit()
+            log.info(f"Pipeline run written to RAW.PIPELINE.RUNS — run_id={run_id}")
+        except Exception as e:
+            self._conn.rollback()
+            log.error(f"Failed to write pipeline run: {e}")
+            raise
+        finally:
+            cur.close()
+
+    def write_api_usage(self, rows: list[dict]) -> None:
+        """
+        Write API usage stats rows to RAW.PIPELINE.API_USAGE.
+        Each row should have: run_id, run_at, source, credits_remaining,
+        credits_limit, credits_used, reset_date.
+        """
+        if not rows:
+            return
+
+        cur = self._conn.cursor()
+        try:
+            cur.executemany(
+                """
+                INSERT INTO RAW.PIPELINE.API_USAGE (
+                    run_id, run_at, source, credits_remaining,
+                    credits_limit, credits_used, reset_date
+                )
+                VALUES (%s, %s::TIMESTAMP_TZ, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        row["run_id"],
+                        row["run_at"].isoformat(),
+                        row["source"],
+                        row.get("credits_remaining"),
+                        row.get("credits_limit"),
+                        row.get("credits_used"),
+                        row.get("reset_date"),
+                    )
+                    for row in rows
+                ],
+            )
+            self._conn.commit()
+            log.info(f"API usage written to RAW.PIPELINE.API_USAGE — {len(rows)} rows.")
+        except Exception as e:
+            self._conn.rollback()
+            log.error(f"Failed to write API usage: {e}")
+            raise
+        finally:
+            cur.close()
+
     # ------------------------------------------------------------------ #
     # Private helpers
     # ------------------------------------------------------------------ #
