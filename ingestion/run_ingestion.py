@@ -51,6 +51,7 @@ def run_pipeline() -> bool:
                 queries=[
                     "Data Analyst in New York",
                     "Analytics Engineer in New York",
+                    "Data Engineer in New York",
                 ],
                 date_posted="3days",
             )

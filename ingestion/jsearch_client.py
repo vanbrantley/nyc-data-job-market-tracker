@@ -35,10 +35,10 @@ BASE_URL = "https://jsearch.p.rapidapi.com/search-v2"
 RAPIDAPI_HOST = "jsearch.p.rapidapi.com"
 
 # 200 credits/month, runs every 3 days (~10 runs/month),
-# 2 queries per run → 10 pages per query uses 200 credits exactly.
-# Set to 9 to leave a small buffer for reruns / debugging.
-MAX_PAGES_PER_QUERY = 9
-# MAX_PAGES_PER_QUERY = 2  # down from 9 to save tokens in case of pipeline test failure
+# 3 queries per run → 6 pages per query = 180 credits max.
+# Leaves 20 for debugging/reruns.
+MAX_PAGES_PER_QUERY = 6
+# MAX_PAGES_PER_QUERY = 2  # for testing
 
 RESULTS_PER_PAGE = 10  # JSearch default; not configurable on free tier
 MAX_RETRIES = 3
@@ -53,7 +53,7 @@ class JSearchClient:
     Usage:
         client = JSearchClient()
         rows = client.fetch_all(
-            queries=["Data Analyst in New York", "Analytics Engineer in New York"],
+            queries=["Data Analyst in New York", "Analytics Engineer in New York", "Data Engineer in New York",],
             date_posted="3days",
         )
     """
@@ -198,6 +198,7 @@ class JSearchClient:
             "num_pages": "1",
             "country": "us",
             "date_posted": date_posted,
+            "job_requirements": "under_3_years_experience,no_experience",
         }
         if cursor:
             params["cursor"] = cursor
