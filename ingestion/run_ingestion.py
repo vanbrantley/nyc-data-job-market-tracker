@@ -22,8 +22,8 @@ log = logging.getLogger("orchestrator")
 
 JSEARCH_QUERIES = [
     "Data Analyst in New York",
-    # "Analytics Engineer in New York",
-    # "Data Engineer in New York",
+    "Analytics Engineer in New York",
+    "Data Engineer in New York",
 ]
 
 THEIRSTACK_CONFIGS = [
@@ -94,59 +94,59 @@ def run_pipeline() -> bool:
             log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
             failures.append("jsearch_snowflake")
 
-    #     # ------------------------------------------------------------------ #
-    #     # 2. TheirStack — collect then immediately load
-    #     # ------------------------------------------------------------------ #
-    #     try:
-    #         discovered_at_gte = None
-    #         try:
-    #             discovered_at_gte = loader.get_theirstack_high_water_mark()
-    #         except Exception as e:
-    #             log.warning(
-    #                 f"Could not fetch TheirStack high-water mark: {e}. "
-    #                 f"Falling back to full 7-day window."
-    #             )
+        # ------------------------------------------------------------------ #
+        # 2. TheirStack — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            discovered_at_gte = None
+            try:
+                discovered_at_gte = loader.get_theirstack_high_water_mark()
+            except Exception as e:
+                log.warning(
+                    f"Could not fetch TheirStack high-water mark: {e}. "
+                    f"Falling back to full 7-day window."
+                )
 
-    #         results["theirstack"] = theirstack_client.fetch_all(
-    #             configs=THEIRSTACK_CONFIGS,
-    #             discovered_at_gte=discovered_at_gte,
-    #         )
-    #         log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
-    #     except Exception as e:
-    #         log.error(f"TheirStack source FAILED: {e}", exc_info=True)
-    #         failures.append("theirstack")
+            results["theirstack"] = theirstack_client.fetch_all(
+                configs=THEIRSTACK_CONFIGS,
+                discovered_at_gte=discovered_at_gte,
+            )
+            log.info(f"TheirStack — {len(results['theirstack'])} rows collected.")
+        except Exception as e:
+            log.error(f"TheirStack source FAILED: {e}", exc_info=True)
+            failures.append("theirstack")
 
-    #     try:
-    #         if results["theirstack"]:
-    #             load_results = loader.load(results["theirstack"])
-    #             for table, count in load_results.items():
-    #                 log.info(f"  {table}: {count} rows inserted.")
-    #         else:
-    #             log.warning("TheirStack — no rows to load, skipping Snowflake write.")
-    #     except Exception as e:
-    #         log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
-    #         failures.append("theirstack_snowflake")
+        try:
+            if results["theirstack"]:
+                load_results = loader.load(results["theirstack"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("TheirStack — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("theirstack_snowflake")
 
-    #     # ------------------------------------------------------------------ #
-    #     # 3. Built In NYC — collect then immediately load
-    #     # ------------------------------------------------------------------ #
-    #     try:
-    #         results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
-    #         log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
-    #     except Exception as e:
-    #         log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
-    #         failures.append("builtin")
+        # ------------------------------------------------------------------ #
+        # 3. Built In NYC — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
+            log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
+        except Exception as e:
+            log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
+            failures.append("builtin")
 
-    #     try:
-    #         if results["builtin"]:
-    #             load_results = loader.load(results["builtin"])
-    #             for table, count in load_results.items():
-    #                 log.info(f"  {table}: {count} rows inserted.")
-    #         else:
-    #             log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
-    #     except Exception as e:
-    #         log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
-    #         failures.append("builtin_snowflake")
+        try:
+            if results["builtin"]:
+                load_results = loader.load(results["builtin"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("builtin_snowflake")
 
     # ------------------------------------------------------------------ #
     # 4. Run summary
