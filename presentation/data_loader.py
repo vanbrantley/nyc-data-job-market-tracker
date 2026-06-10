@@ -12,19 +12,6 @@ import streamlit as st
 
 load_dotenv()
 
-
-# @st.cache_resource
-# def get_connection():
-#     """Returns a cached Snowflake connection."""
-#     return snowflake.connector.connect(
-#         account=os.getenv("SNOWFLAKE_ACCOUNT"),
-#         user=os.getenv("SNOWFLAKE_USER"),
-#         password=os.getenv("SNOWFLAKE_PASSWORD"),
-#         role=os.getenv("SNOWFLAKE_ROLE"),
-#         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-#         database=os.getenv("SNOWFLAKE_DATABASE"),
-#     )
-
 def get_secret(key: str) -> str:
     """Get secret from environment variable or Streamlit secrets."""
     value = os.getenv(key)
@@ -35,7 +22,6 @@ def get_secret(key: str) -> str:
     except (KeyError, FileNotFoundError):
         raise ValueError(f"Secret '{key}' not found in environment or Streamlit secrets")
 
-@st.cache_resource
 def get_connection():
     """Returns a cached Snowflake connection."""
     return snowflake.connector.connect(
@@ -49,14 +35,17 @@ def get_connection():
 
 
 def run_query(sql: str) -> pd.DataFrame:
-    """Execute SQL and return a DataFrame using the manual cursor pattern."""
+    """Execute SQL and return a DataFrame. Creates a fresh connection each time."""
     conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(sql)
-    rows = cur.fetchall()
-    cols = [desc[0] for desc in cur.description]
-    cur.close()
-    return pd.DataFrame(rows, columns=cols)
+    try:
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        cols = [desc[0] for desc in cur.description]
+        cur.close()
+        return pd.DataFrame(rows, columns=cols)
+    finally:
+        conn.close()
 
 
 @st.cache_data(ttl=3600)
