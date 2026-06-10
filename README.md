@@ -221,12 +221,6 @@ The full pipeline (ingest → enrich → dbt run → dbt test) runs automaticall
 
 ---
 
-## Screenshots
-
-*Coming soon.*
-
----
-
 ## Author
 
 Van Brantley — [github.com/vanbrantley](https://github.com/vanbrantley)
