@@ -12,7 +12,7 @@ import streamlit as st
 from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from data_loader import load_fct_job_postings, format_salary
+from data_loader import load_fct_job_postings, format_salary, format_source, format_snake_case
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 df_full = load_fct_job_postings()
@@ -71,14 +71,11 @@ with st.sidebar:
     )
 
     # Role archetype
-    def fmt_snake_case(val: str) -> str:
-        return val.replace("_", " ") if val else val
-
     raw_archetypes = sorted(df_full["role_archetype"].dropna().unique().tolist())
     sel_archetypes = st.multiselect(
         "Role Archetype",
         options=raw_archetypes,
-        format_func=fmt_snake_case,
+        format_func=format_snake_case,
         default=[],
         placeholder="All archetypes",
         key="filter_archetypes"
@@ -105,18 +102,11 @@ with st.sidebar:
     )
 
     # Source
-    def fmt_source(val: str) -> str:
-        overrides = {
-            "builtin": "Built In NYC",
-            "jsearch": "JSearch",
-            "theirstack": "TheirStack",
-        }
-        return overrides.get(val, val) if val else val
     sources = sorted(df_full["source"].dropna().unique().tolist())
     sel_sources = st.multiselect(
         "Source",
         options=sources,
-        format_func=fmt_source,
+        format_func=format_source,
         default=[],
         placeholder="All sources",
         key="filter_sources"
@@ -126,7 +116,7 @@ with st.sidebar:
     sel_degrees = st.multiselect(
         "Degree Requirement",
         options=degree_opts,
-        format_func=fmt_snake_case,
+        format_func=format_snake_case,
         default=[],
         placeholder="Any requirement",
         key="filter_degrees"
@@ -249,7 +239,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
         lambda x: x.replace("_", " ") if pd.notna(x) and x else "—"
     )
     display["Work Model"] = df["work_model"].fillna("—")
-    display["Source"] = df["source"].apply(lambda x: fmt_source(x) if pd.notna(x) else "—")
+    display["Source"] = df["source"].apply(lambda x: format_source(x) if pd.notna(x) else "—")
     # display["Salary"] = df.apply(
     #     lambda r: format_salary(r["final_salary_min"], r["final_salary_max"]), axis=1
     # )
@@ -361,7 +351,7 @@ with col_left:
     meta_html = (
         f'<span class="tag-pill {wm_color}">{job.get("work_model", "—")}</span>'
         f'<span class="tag-pill {et_color}">{str(job.get("employment_type","—")).replace("_"," ")}</span>'
-        f'<span class="tag-pill {src_color}">{fmt_source(job.get("source","—"))}</span>'
+        f'<span class="tag-pill {src_color}">{format_source(job.get("source","—"))}</span>'
     )
     st.markdown(meta_html, unsafe_allow_html=True)
 

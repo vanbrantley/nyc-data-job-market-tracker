@@ -13,16 +13,38 @@ import streamlit as st
 load_dotenv()
 
 
+# @st.cache_resource
+# def get_connection():
+#     """Returns a cached Snowflake connection."""
+#     return snowflake.connector.connect(
+#         account=os.getenv("SNOWFLAKE_ACCOUNT"),
+#         user=os.getenv("SNOWFLAKE_USER"),
+#         password=os.getenv("SNOWFLAKE_PASSWORD"),
+#         role=os.getenv("SNOWFLAKE_ROLE"),
+#         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
+#         database=os.getenv("SNOWFLAKE_DATABASE"),
+#     )
+
+def get_secret(key: str) -> str:
+    """Get secret from environment variable or Streamlit secrets."""
+    value = os.getenv(key)
+    if value:
+        return value
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        raise ValueError(f"Secret '{key}' not found in environment or Streamlit secrets")
+
 @st.cache_resource
 def get_connection():
     """Returns a cached Snowflake connection."""
     return snowflake.connector.connect(
-        account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        user=os.getenv("SNOWFLAKE_USER"),
-        password=os.getenv("SNOWFLAKE_PASSWORD"),
-        role=os.getenv("SNOWFLAKE_ROLE"),
-        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-        database=os.getenv("SNOWFLAKE_DATABASE"),
+        account=get_secret("SNOWFLAKE_ACCOUNT"),
+        user=get_secret("SNOWFLAKE_USER"),
+        password=get_secret("SNOWFLAKE_PASSWORD"),
+        role=get_secret("SNOWFLAKE_ROLE"),
+        warehouse=get_secret("SNOWFLAKE_WAREHOUSE"),
+        database=get_secret("SNOWFLAKE_DATABASE"),
     )
 
 
@@ -86,6 +108,24 @@ def load_fct_job_postings() -> pd.DataFrame:
 
     return df
 
+@st.cache_data(ttl=300)
+def load_pipeline_runs() -> pd.DataFrame:
+    """Load pipeline run history from RAW.PIPELINE.RUNS."""
+    df = run_query("SELECT * FROM RAW.PIPELINE.RUNS ORDER BY RUN_AT")
+    df.columns = [c.lower() for c in df.columns]
+    df["run_at"] = pd.to_datetime(df["run_at"], errors="coerce")
+    return df
+
+
+@st.cache_data(ttl=300)
+def load_api_usage() -> pd.DataFrame:
+    """Load API usage history from RAW.PIPELINE.API_USAGE."""
+    df = run_query("SELECT * FROM RAW.PIPELINE.API_USAGE ORDER BY RUN_AT, SOURCE")
+    df.columns = [c.lower() for c in df.columns]
+    df["run_at"] = pd.to_datetime(df["run_at"], errors="coerce")
+    df["reset_date"] = df["reset_date"].apply(lambda x: str(x)[:10] if x else "—")
+    return df
+
 
 def _parse_variant_array(val) -> list:
     """Parse a Snowflake VARIANT column value into a Python list."""
@@ -101,6 +141,16 @@ def _parse_variant_array(val) -> list:
             return []
     return []
 
+def format_source(val: str) -> str:
+    overrides = {
+        "builtin": "Built In NYC",
+        "jsearch": "JSearch",
+        "theirstack": "TheirStack",
+    }
+    return overrides.get(val, val) if val else val
+
+def format_snake_case(val: str) -> str:
+    return val.replace("_", " ") if val else val
 
 def format_salary(min_val, max_val) -> str:
     """Format a salary range for display."""
