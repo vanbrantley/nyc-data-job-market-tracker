@@ -157,6 +157,7 @@ def enrich_job(
                 max_tokens=MAX_TOKENS,
                 temperature=TEMPERATURE,
                 response_format={"type": "json_object"},
+                timeout=30,
             )
             raw = response.choices[0].message.content.strip()
             parsed = json.loads(raw)
