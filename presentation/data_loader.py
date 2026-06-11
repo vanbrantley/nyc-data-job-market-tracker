@@ -36,6 +36,8 @@ def get_connection():
 
 def run_query(sql: str) -> pd.DataFrame:
     """Execute SQL and return a DataFrame. Creates a fresh connection each time."""
+    # Note: fetch_pandas_all() is avoided here due to connector/pandas compatibility
+    # issues in this environment. Manual cursor pattern is functionally equivalent.
     conn = get_connection()
     try:
         cur = conn.cursor()

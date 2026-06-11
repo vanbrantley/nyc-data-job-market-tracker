@@ -1,8 +1,14 @@
 name: NYC Job Market — Data Pipeline
 
 on:
-  schedule:
-    - cron: "14 10 * * 1,4"  # 10am UTC (6am EDT) every Monday and Thursday (~every 3 days)
+  # Schedule removed — GitHub Actions cron is unreliable on free accounts and
+  # would fire hours late or not at all. Pipeline is triggered externally via
+  # cron-job.org which hits the workflow_dispatch webhook on a reliable schedule.
+  # See: https://cron-job.org for the trigger configuration.
+  #
+  # Previous schedule:
+  # schedule:
+  #   - cron: "14 10 * * 1,4"  # 10am UTC (6am EDT) every Monday and Thursday
   workflow_dispatch:         # allow manual trigger from GitHub UI for testing
 
 jobs:
