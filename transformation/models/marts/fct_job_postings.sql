@@ -18,6 +18,8 @@ select
     longitude,
     work_model,
     employment_type,
+    listed_seniority,
+    is_explicitly_entry_level,
     final_salary_min,
     final_salary_max,
     inferred_seniority,

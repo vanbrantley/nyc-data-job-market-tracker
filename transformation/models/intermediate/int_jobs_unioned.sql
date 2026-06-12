@@ -55,7 +55,12 @@ enrichment as (
         salary_max                  as llm_salary_max,
         confidence_score,
         enriched_at
+        
     from ENRICHED.PUBLIC.JOB_ENRICHMENT
+    qualify ROW_NUMBER() over (
+        partition by job_id
+        order by enriched_at desc
+    ) = 1
 
 ),
 
@@ -77,6 +82,8 @@ joined as (
         j.longitude,
         j.work_model,
         j.employment_type,
+        j.listed_seniority,
+        j.is_explicitly_entry_level,
 
         -- salary: prefer structured payload value, fall back to LLM estimate
         COALESCE(j.salary_min, e.llm_salary_min)   as final_salary_min,

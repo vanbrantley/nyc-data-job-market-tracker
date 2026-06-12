@@ -121,8 +121,19 @@ class JSearchClient:
                 # Log and continue — one bad query shouldn't abort the others.
                 log.error(f"Query {query!r} failed: {e}", exc_info=True)
 
-        log.info(f"fetch_all complete — {len(all_rows)} total rows.")
-        return all_rows
+        log.info(f"fetch_all complete — {len(all_rows)} total rows before dedup.")
+
+        # deduplicate by job_id across queries — same job can appear in multiple query results
+        seen_ids: set[str] = set()
+        deduped_rows: list[dict] = []
+        for row in all_rows:
+            job_id = row["RAW_PAYLOAD"].get("job_id")
+            if job_id not in seen_ids:
+                seen_ids.add(job_id)
+                deduped_rows.append(row)
+
+        log.info(f"fetch_all complete — {len(deduped_rows)} rows after dedup ({len(all_rows) - len(deduped_rows)} duplicates removed).")
+        return deduped_rows
 
     # ------------------------------------------------------------------ #
     # Private helpers

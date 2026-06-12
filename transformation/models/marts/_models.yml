@@ -73,6 +73,20 @@ models:
           - accepted_values:
               values: ['full_time', 'part_time', 'contract', 'other']
 
+      - name: listed_seniority
+        description: >
+          Seniority level as explicitly labeled by the source. Populated for
+          TheirStack (native field) and Built In (scraped from page). NULL for
+          JSearch, which has no structured seniority field.
+
+      - name: is_explicitly_entry_level
+        description: >
+          Boolean flag indicating the job title explicitly signals an entry-level
+          role via keywords: entry, junior, jr, new grad, early career. Derived
+          from job title across all three sources.
+        tests:
+          - not_null
+
       - name: final_salary_min
         description: >
           Minimum annual salary in USD. Prefers structured payload value; falls

@@ -64,6 +64,13 @@ extracted as (
             then RAW_PAYLOAD:baseSalary:value:maxValue::FLOAT
         end                                                         as salary_max,
 
+        REPLACE(LOWER(RAW_PAYLOAD:seniority::STRING), ' ', '_')    as listed_seniority,
+
+        REGEXP_LIKE(
+            LOWER(RAW_PAYLOAD:title::STRING),
+            '.*(entry|junior|jr\\.?|new.?grad|early.?career).*'
+        )                                                           as is_explicitly_entry_level,
+
         INGESTED_AT                                                 as ingested_at
 
     from source
@@ -76,7 +83,7 @@ deduped as (
     from extracted
     qualify ROW_NUMBER() over (
         partition by job_id
-        order by ingested_at desc
+        order by ingested_at desc, ingestion_query desc
     ) = 1
 
 ),
