@@ -64,7 +64,7 @@ extracted as (
             then RAW_PAYLOAD:baseSalary:value:maxValue::FLOAT
         end                                                         as salary_max,
 
-        REPLACE(LOWER(RAW_PAYLOAD:seniority::STRING), ' ', '_')    as listed_seniority,
+        NULLIF(REPLACE(LOWER(RAW_PAYLOAD:seniority::STRING), ' ', '_'), 'not_found') as listed_seniority,
 
         REGEXP_LIKE(
             LOWER(RAW_PAYLOAD:title::STRING),
