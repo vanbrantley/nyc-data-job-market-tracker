@@ -297,6 +297,12 @@ except Exception as e:
 
 if tracking_available:
 
+    # calculate per-run credits burned by diffing consecutive rows per source
+    usage_df = usage_df.sort_values(["source", "run_at"]).reset_index(drop=True)
+    usage_df["credits_this_run"] = usage_df.groupby("source")["credits_used"].diff()
+    # for the first run of each source, diff() returns NaN — use credits_used directly
+    usage_df["credits_this_run"] = usage_df["credits_this_run"].fillna(usage_df["credits_used"])
+
     # ── Current credit status ─────────────────────────────────────────────
     st.markdown("##### Current Credit Status")
 
@@ -360,7 +366,7 @@ if tracking_available:
             if len(src_data) > 0:
                 fig_credits.add_bar(
                     x=src_data["run_at"].dt.strftime("%b %d %H:%M"),
-                    y=src_data["credits_used"],
+                    y=src_data["credits_this_run"],
                     name=format_source(src),
                     marker_color=color,
                 )
@@ -408,7 +414,7 @@ if tracking_available:
     for _, run_row in runs_df.iterrows():
         run_id = run_row["run_id"]
         run_usage = usage_df[usage_df["run_id"] == run_id]
-        total_credits = run_usage["credits_used"].sum() if len(run_usage) > 0 else 0
+        total_credits = run_usage["credits_this_run"].sum() if len(run_usage) > 0 else 0
         total_jobs = run_row["total_rows"]
         cpp = round(total_credits / total_jobs, 2) if total_jobs > 0 else None
         efficiency_rows.append({
@@ -473,52 +479,3 @@ if tracking_available:
 
 else:
     st.info("No pipeline tracking data yet — will populate after the next run.")
-
-# # ── Architecture diagram ──────────────────────────────────────────────────────
-# st.markdown("#### Pipeline Architecture")
-# st.markdown(
-#     """
-#     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:24px 28px; font-family:monospace; font-size:0.85rem; line-height:1.9; color:#334155;">
-
-#     <div style="font-family:sans-serif; font-weight:700; font-size:1rem; color:#0f172a; margin-bottom:12px;">
-#         NYC Data Job Market Tracker — End-to-End Pipeline
-#     </div>
-
-#     <b>INGESTION</b> (GitHub Actions cron · Mon/Thu)<br>
-#     ├── <b>JSearch</b> (RapidAPI) → cursor-based pagination → raw VARIANT rows<br>
-#     ├── <b>TheirStack</b> → two-stage free-sweep / paid-fetch → raw VARIANT rows<br>
-#     └── <b>Built In NYC</b> → BeautifulSoup scraper → HTML-stripped descriptions<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
-#     <b>SNOWFLAKE RAW</b> (strict ELT — no transformation at ingest)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;RAW.JSEARCH_RAW · RAW.THEIRSTACK_RAW · RAW.BUILTIN_RAW<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
-#     <b>ENRICHMENT</b> (GPT-4o-mini · runs post-ingest)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;Structured metadata extraction: role_archetype, work_focus,<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;tech_stack, paradigms, salary (from description text),<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;seniority inference, title inflation flag + reasoning<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;→ writes to ENRICHED.JOB_ENRICHMENT<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
-#     <b>dbt TRANSFORMATION</b> (runs in CI after ingest + enrich)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;stg_jsearch · stg_theirstack · stg_builtin (views)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ int_jobs_unioned · int_jobs_deduped · int_jobs_enriched (ephemeral)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ fct_job_postings (table · ANALYTICS_PROD.PUBLIC)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
-#     <b>PRESENTATION</b> (this dashboard · Streamlit)<br>
-#     &nbsp;&nbsp;&nbsp;&nbsp;Market Insights · Job Explorer · Pipeline Health<br>
-#     </div>
-#     """,
-#     unsafe_allow_html=True,
-# )
-
-# st.markdown("")
-# st.markdown(
-#     """
-#     **Key design decisions:**
-#     - **VARIANT columns** for raw JSON storage — schema-on-read, no ingest-time transformation
-#     - **ELT over ETL** — all transformation happens in dbt, not Python
-#     - **Ephemeral intermediates** — no intermediate table storage, only staging views and the final mart table hit Snowflake storage
-#     - **Cross-source deduplication** via URL normalization before unioning
-#     - **COALESCE salary logic** — structured payload salary takes precedence over LLM-extracted salary from description text
-#     - **POSIX ERE regex** for seniority filtering (Snowflake-compatible word boundary handling)
-#     """,
-# )
