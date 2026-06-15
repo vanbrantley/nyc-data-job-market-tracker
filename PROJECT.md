@@ -313,6 +313,8 @@ These are non-obvious rules that must be followed. Suggesting alternatives to th
 - `JOB_ENRICHMENT` table has duplicate `job_id` rows — mitigated by dedup in `int_jobs_unioned.sql` enrichment CTE
 - Built In seniority not in JSON-LD — extracted from HTML, fragile if page structure changes
 - JSearch `job_requirements` filter (`under_3_years_experience`) doesn't reliably exclude senior roles — senior title regex in staging is the real filter
+- API credit tracking (credits_used_this_run) may be slightly overstated when manual 
+JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
 
 ---
 

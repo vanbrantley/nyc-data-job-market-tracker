@@ -203,24 +203,41 @@ class SnowflakeLoader:
         finally:
             cur.close()
 
+    def get_prev_api_usage(self, source: str) -> dict | None:
+        """
+        Get the most recent credits_remaining and credits_used_cumulative
+        for a source — used to calculate per-run burn and detect window resets.
+        """
+        cur = self._conn.cursor()
+        try:
+            cur.execute("""
+                SELECT credits_remaining, credits_used_cumulative
+                FROM RAW.PIPELINE.API_USAGE
+                WHERE source = %s
+                ORDER BY run_at DESC
+                LIMIT 1
+            """, (source,))
+            row = cur.fetchone()
+            return {
+                "credits_remaining": row[0],
+                "credits_used_cumulative": row[1]
+            } if row else None
+        finally:
+            cur.close()
+
     def write_api_usage(self, rows: list[dict]) -> None:
-        """
-        Write API usage stats rows to RAW.PIPELINE.API_USAGE.
-        Each row should have: run_id, run_at, source, credits_remaining,
-        credits_limit, credits_used, reset_date.
-        """
         if not rows:
             return
-
         cur = self._conn.cursor()
         try:
             cur.executemany(
                 """
                 INSERT INTO RAW.PIPELINE.API_USAGE (
                     run_id, run_at, source, credits_remaining,
-                    credits_limit, credits_used, reset_date
+                    credits_limit, credits_used_cumulative,
+                    credits_used_this_run, reset_date
                 )
-                VALUES (%s, %s::TIMESTAMP_NTZ, %s, %s, %s, %s, %s)
+                VALUES (%s, %s::TIMESTAMP_NTZ, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -229,7 +246,8 @@ class SnowflakeLoader:
                         row["source"],
                         row.get("credits_remaining"),
                         row.get("credits_limit"),
-                        row.get("credits_used"),
+                        row.get("credits_used_cumulative"),
+                        row.get("credits_used_this_run"),
                         row.get("reset_date"),
                     )
                     for row in rows

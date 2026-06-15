@@ -297,12 +297,6 @@ except Exception as e:
 
 if tracking_available:
 
-    # calculate per-run credits burned by diffing consecutive rows per source
-    usage_df = usage_df.sort_values(["source", "run_at"]).reset_index(drop=True)
-    usage_df["credits_this_run"] = usage_df.groupby("source")["credits_used"].diff()
-    # for the first run of each source, diff() returns NaN — use credits_used directly
-    usage_df["credits_this_run"] = usage_df["credits_this_run"].fillna(usage_df["credits_used"])
-
     # ── Current credit status ─────────────────────────────────────────────
     st.markdown("##### Current Credit Status")
 
@@ -315,7 +309,7 @@ if tracking_available:
         src = row["source"]
         remaining = row["credits_remaining"]
         limit = row["credits_limit"] or 200
-        used = row["credits_used"]
+        used = row["credits_used_cumulative"]
         reset = row["reset_date"]
         pct_remaining = remaining / limit if limit else 0
 
@@ -366,7 +360,7 @@ if tracking_available:
             if len(src_data) > 0:
                 fig_credits.add_bar(
                     x=src_data["run_at"].dt.strftime("%b %d %H:%M"),
-                    y=src_data["credits_this_run"],
+                    y=src_data["credits_used_this_run"],
                     name=format_source(src),
                     marker_color=color,
                 )
@@ -414,9 +408,9 @@ if tracking_available:
     for _, run_row in runs_df.iterrows():
         run_id = run_row["run_id"]
         run_usage = usage_df[usage_df["run_id"] == run_id]
-        total_credits = run_usage["credits_this_run"].sum() if len(run_usage) > 0 else 0
+        total_credits = run_usage["credits_used_this_run"].sum() if len(run_usage) > 0 else 0
         total_jobs = run_row["total_rows"]
-        cpp = round(total_credits / total_jobs, 2) if total_jobs > 0 else None
+        cpp = round(total_credits / total_jobs, 2) if (total_jobs > 0 and pd.notna(total_credits) and total_credits > 0) else None
         efficiency_rows.append({
             "Run": run_row["run_at"].strftime("%b %d, %Y %H:%M"),
             "Status": run_row["status"],
@@ -424,8 +418,8 @@ if tracking_available:
             "TheirStack": run_row["theirstack_rows"],
             "Built In": run_row["builtin_rows"],
             "Total Jobs": total_jobs,
-            "Credits Used": int(total_credits) if total_credits else "—",
-            "Credits / Job": cpp if cpp else "—",
+            "Credits Used": int(total_credits) if pd.notna(total_credits) and total_credits else "—",
+            "Credits / Job": cpp,
             "Duration (s)": round(run_row["duration_seconds"], 1),
         })
 
@@ -433,6 +427,9 @@ if tracking_available:
         pd.DataFrame(efficiency_rows),
         use_container_width=True,
         hide_index=True,
+        column_config={
+            "Credits / Job": st.column_config.NumberColumn("Credits / Job", format="%.2f"),
+        }
     )
 
     # ── Forecast ──────────────────────────────────────────────────────────
@@ -467,8 +464,7 @@ if tracking_available:
             continue
 
         src_usage_window = src_usage_window.copy()
-        src_usage_window["credits_burned"] = src_usage_window["credits_used"].diff()
-        avg_burn = src_usage_window["credits_burned"].dropna().mean()
+        avg_burn = src_usage_window["credits_used_this_run"].mean()
         runs_left = int(remaining / avg_burn) if avg_burn > 0 else "∞"
 
         st.markdown(
