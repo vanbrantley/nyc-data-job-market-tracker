@@ -222,11 +222,8 @@ class JSearchClient:
             "query": query,
             "num_pages": "1",
             "country": "us",
-            # "location": "New York City, New York, United States",
-            # "radius": "50",
             "date_posted": date_posted,
             "employment_types": "FULLTIME",
-            "job_requirements": "under_3_years_experience,no_experience",
             "exclude_job_publishers": (
                 "Talent.com,Learn4Good,JobLeads,BeBee,WhatJobs,Jobilize,"
                 "Jooble,Adzuna,Ladders,Snagajob,Institute Of Data Jobs,"
