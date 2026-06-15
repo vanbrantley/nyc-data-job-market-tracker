@@ -16,6 +16,7 @@
 
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -44,6 +45,11 @@ RESULTS_PER_PAGE = 10  # JSearch default; not configurable on free tier
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 2  # seconds; doubles on each retry (2, 4, 8)
 REQUEST_TIMEOUT = 30  # seconds
+
+RELEVANT_TITLE_PATTERN = re.compile(
+            r'data analyst|data engineer|analytics engineer',
+            re.IGNORECASE
+        )
 
 
 class JSearchClient:
@@ -120,6 +126,14 @@ class JSearchClient:
             except Exception as e:
                 # Log and continue — one bad query shouldn't abort the others.
                 log.error(f"Query {query!r} failed: {e}", exc_info=True)
+
+        # filter to relevant data roles by title before dedup
+        pre_filter = len(all_rows)
+        all_rows = [
+            row for row in all_rows
+            if RELEVANT_TITLE_PATTERN.search(row["RAW_PAYLOAD"].get("job_title", ""))
+        ]
+        log.info(f"Title filter: {pre_filter} → {len(all_rows)} rows ({pre_filter - len(all_rows)} dropped)")
 
         log.info(f"fetch_all complete — {len(all_rows)} total rows before dedup.")
 
@@ -208,8 +222,17 @@ class JSearchClient:
             "query": query,
             "num_pages": "1",
             "country": "us",
+            "location": "New York City, New York, United States",
+            "radius": "50",
             "date_posted": date_posted,
+            "employment_types": "FULLTIME",
             "job_requirements": "under_3_years_experience,no_experience",
+            "exclude_job_publishers": (
+                "Talent.com,Learn4Good,JobLeads,BeBee,WhatJobs,Jobilize,"
+                "Jooble,Adzuna,Ladders,Snagajob,Institute Of Data Jobs,"
+                "Tech Engineer Jobs,Allied-IT Jobs,United States Jobs Expertini,"
+                "Trigyn Technologies,Trigyn,Resume-Library.com,Sign In"
+            ),
         }
         if cursor:
             params["cursor"] = cursor

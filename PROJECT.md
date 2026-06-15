@@ -318,12 +318,11 @@ These are non-obvious rules that must be followed. Suggesting alternatives to th
 
 ## v1 Backlog
 
-- [ ] 
 
-- [ ] Fix "Lookers" typo in enrichment prompt
-- [ ] Clean up JSearch API filtering -- more strict on query parameters, back filter previous results
 - [ ] Built In backfill (pending IP cooldown + Similar Jobs fix)
+- [ ] Clean up JSearch API filtering -- more strict on query parameters, back filter previous results
 
+- [ ] acknowledges_ai field
 - [ ] Local-only investigation page — `is_local` gate, shows filtered-out jobs for debugging
 - [ ] Investigate/handle "Equivalent Ok" degree requirement
 - [ ] Revisit "Title Inflated" idea and its implementation
