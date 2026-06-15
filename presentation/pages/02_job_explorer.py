@@ -27,7 +27,7 @@ st.caption(
 FILTER_KEYS = [
     "filter_techs", "filter_archetypes", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
-    "filter_salary", "filter_dates", "filter_title", "filter_inflated"
+    "filter_salary", "filter_dates", "filter_title", "filter_salary_only"
 ]
 
 # Compute these before the sidebar so pending_clear can reference them
@@ -51,7 +51,7 @@ with st.sidebar:
         st.session_state["filter_salary"] = (sal_min_overall, sal_max_overall)
         st.session_state["filter_dates"] = (date_min, date_max)
         st.session_state["filter_title"] = ""
-        st.session_state["filter_inflated"] = False
+        st.session_state["filter_salary_only"] = False
         st.session_state["pending_clear"] = False
 
     # Tech stacks
@@ -152,10 +152,9 @@ with st.sidebar:
         key="filter_title"
     ).strip().lower()
 
-    # Title inflation flag
-    show_inflated_only = st.checkbox(
-        "Show inflated titles only",
-        key="filter_inflated"
+    salary_only = st.checkbox(
+        "Show jobs with salary data only",
+        key="filter_salary_only"
     )
 
     st.divider()
@@ -212,9 +211,8 @@ if title_search:
     )
     df = df[mask]
 
-# Inflation filter
-if show_inflated_only:
-    df = df[df["is_title_inflated"] == True]
+if st.session_state.get("filter_salary_only"):
+    df = df[df["final_salary_min"].notna() & df["final_salary_max"].notna()]
 
 # ── Summary bar ───────────────────────────────────────────────────────────────
 total = len(df_full)
@@ -245,7 +243,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     # )
     display["sal_min"] = df["final_salary_min"].values
     display["sal_max"] = df["final_salary_max"].values
-    display["Posted"] = df["date_posted"].dt.strftime("%b %d, %Y").fillna("—")
+    display["Posted"] = df["date_posted"].values
     # Keep job_id as hidden key for row linking
     display["_job_id"] = df["job_id"].values
     display["_idx"] = df.index.values
@@ -296,6 +294,7 @@ event = st.dataframe(
     column_config={
         "sal_min": st.column_config.NumberColumn("Sal. Min", format="$%d"),
         "sal_max": st.column_config.NumberColumn("Sal. Max", format="$%d"),
+        "Posted": st.column_config.DateColumn("Posted", format="MMM DD, YYYY"),
     }
 )
 

@@ -54,6 +54,7 @@ tech_stack_required vs tech_stack_preferred:
   preferred = explicitly listed under preferred, nice to have, or bonus qualifications
   if the posting does not distinguish, put all tools in tech_stack_required
   normalize names: "MS Excel" -> "excel", "Google BigQuery" -> "bigquery", "Apache Airflow" -> "airflow"
+  always use "looker" not "lookers" — it is a product name, not a plural noun
 
 paradigms_required vs paradigms_preferred:
   paradigms are concepts and practices, not tools — e.g. "dimensional modeling", "etl design",
