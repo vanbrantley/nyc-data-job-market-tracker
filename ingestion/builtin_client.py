@@ -56,6 +56,8 @@ MIN_SCRAPE_DELAY = 4.0  # seconds between job page requests
 MAX_SCRAPE_DELAY = 8.0
 REQUEST_TIMEOUT = 15  # seconds
 
+KNOWN_SENIORITY_VALUES = {"Entry level", "Junior", "Mid level"}
+
 
 class BuiltInNYCScraper:
     """
@@ -253,13 +255,17 @@ class BuiltInNYCScraper:
                     continue
 
                 # extract seniority from HTML (not in JSON-LD)
-                # anchor on the trophy icon wrapper div, then grab its span
+                # scope to #main only — excludes Similar Jobs section
+                main = soup.find(id="main")
                 seniority = None
-                for div in soup.find_all("div", class_=lambda c: c and "align-items-start" in c and "gap-sm" in c):
-                    if div.find("i", class_=lambda c: c and "fa-trophy" in c):
-                        span = div.find("span")
-                        seniority = span.get_text(strip=True) if span else None
-                        break
+                if main:
+                    for div in main.find_all("div", class_=lambda c: c and "align-items-start" in c and "gap-sm" in c):
+                        if div.find("i", class_=lambda c: c and "fa-trophy" in c):
+                            span = div.find("span")
+                            if span:
+                                text = span.get_text(strip=True)
+                                seniority = text if text in KNOWN_SENIORITY_VALUES else None
+                            break
 
                 job_posting["seniority"] = seniority
                 log.info(f"  seniority: {seniority}")
