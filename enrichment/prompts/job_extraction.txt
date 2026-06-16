@@ -6,8 +6,8 @@ The JSON must conform to this exact schema:
 
 {
   "inferred_seniority": <"entry" | "mid" | "senior">,
-  "is_title_inflated": <true | false>,
-  "inflation_reasoning": <string — 1-2 sentences or null if not inflated>,
+  "title_seniority_signal": <"accurate" | "overstated" | "understated">,
+  "title_signal_reasoning": <string — 1-2 sentences or null if accurate>,
   "role_archetype": <"data_analyst" | "analytics_engineer" | "data_engineer" | "hybrid" | "software_engineer">,
   "work_focus": <string — short phrase describing primary day-to-day work, max 8 words>,
   "tech_stack_required": <array of lowercase strings — tools explicitly required>,
@@ -19,6 +19,9 @@ The JSON must conform to this exact schema:
   "years_required_max": <integer or null>,
   "salary_min": <integer or null>,
   "salary_max": <integer or null>,
+  "acknowledges_ai": <true | false>,
+  "domain": <string or null>,
+  "explicitly_encourages_applicants": <true | false>,
   "confidence_score": <float 0.0–1.0>
 }
 
@@ -29,7 +32,12 @@ inferred_seniority: base this on actual requirements, NOT the title.
   mid = 2-5 years
   senior = 5+ years
 
-is_title_inflated: true if the title implies higher seniority than inferred_seniority.
+title_seniority_signal: compare the seniority implied by the job title against inferred_seniority.
+  accurate = title aligns with inferred seniority
+  overstated = title implies higher seniority than inferred_seniority supports
+  understated = title implies lower seniority than inferred_seniority supports
+
+title_signal_reasoning: 1-2 sentences explaining the mismatch. null if title_seniority_signal is "accurate".
 
 role_archetype: the primary operational reality of the role.
   data_analyst = focused on querying, reporting, and business insights
@@ -78,6 +86,19 @@ salary_min / salary_max:
   extract only when explicitly stated in the posting as a number
   always as annual integer (convert hourly if needed: hourly * 2080)
   null if not mentioned
+
+acknowledges_ai: true if the posting explicitly mentions AI, LLMs, machine learning tools,
+  ChatGPT, Copilot, or similar in the context of the role or company's work.
+  false if no mention of AI or ML whatsoever.
+
+domain: the industry vertical the company operates in. Use a short lowercase string.
+  Common values: "finance", "healthcare", "retail", "tech", "consulting", "government",
+  "media", "real estate", "education", "logistics"
+  null if the role is at a general-purpose tech company or domain is not determinable.
+
+explicitly_encourages_applicants: true if the posting explicitly states that candidates
+  who do not meet every requirement are still encouraged to apply.
+  false otherwise.
 
 confidence_score: your confidence that the extraction is accurate given description quality.
   penalize heavily for vague, templated, or very short descriptions

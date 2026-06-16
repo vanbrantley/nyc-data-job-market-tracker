@@ -4,8 +4,8 @@ from pydantic import BaseModel, field_validator, model_validator
 
 class JobEnrichmentSchema(BaseModel):
     inferred_seniority: Literal["entry", "mid", "senior"]
-    is_title_inflated: bool
-    inflation_reasoning: Optional[str] = None
+    title_seniority_signal: Literal["accurate", "overstated", "understated"]
+    title_signal_reasoning: Optional[str] = None
     role_archetype: Literal[
         "data_analyst",
         "analytics_engineer",
@@ -23,6 +23,9 @@ class JobEnrichmentSchema(BaseModel):
     years_required_max: Optional[int] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
+    acknowledges_ai: bool
+    domain: Optional[str] = None
+    explicitly_encourages_applicants: bool
     confidence_score: float
 
     @field_validator("work_focus")
@@ -49,6 +52,11 @@ class JobEnrichmentSchema(BaseModel):
     @classmethod
     def normalize_paradigms(cls, v: List[str]) -> List[str]:
         return [item.lower().strip() for item in v]
+
+    @field_validator("domain")
+    @classmethod
+    def normalize_domain(cls, v: Optional[str]) -> Optional[str]:
+        return v.lower().strip() if v else None
 
     @model_validator(mode="after")
     def validate_years_range(self) -> "JobEnrichmentSchema":

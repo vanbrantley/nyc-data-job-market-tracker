@@ -303,6 +303,44 @@ These are non-obvious rules that must be followed. Suggesting alternatives to th
 
 ---
 
+## Validation & Investigations
+
+### LLM Salary Coverage Contribution (June 2026)
+To measure how much the LLM enrichment layer actually contributes to salary coverage,
+we compare structured salary coverage (from source payloads only) against final salary
+coverage (post-COALESCE with LLM fallback) in the mart.
+
+**Structured coverage** — union all three staging views in Snowflake UI:
+```sql
+SELECT
+    COUNT(*)                                                AS total,
+    COUNT(salary_min)                                       AS structured_coverage,
+    ROUND(COUNT(salary_min) / COUNT(*)::FLOAT * 100, 1)    AS structured_pct
+FROM (
+    SELECT salary_min FROM ANALYTICS_PROD.PUBLIC.STG_JSEARCH
+    UNION ALL
+    SELECT salary_min FROM ANALYTICS_PROD.PUBLIC.STG_THEIRSTACK
+    UNION ALL
+    SELECT salary_min FROM ANALYTICS_PROD.PUBLIC.STG_BUILTIN
+)
+```
+
+**Final coverage** — query the mart:
+```sql
+SELECT
+    COUNT(*)                                                        AS total,
+    COUNT(final_salary_min)                                         AS final_coverage,
+    ROUND(COUNT(final_salary_min) / COUNT(*)::FLOAT * 100, 1)      AS final_pct
+FROM ANALYTICS_PROD.PUBLIC.FCT_JOB_POSTINGS
+```
+
+**Result (June 2026, n=229):** structured coverage was 28.8% (66/229).
+Final coverage after LLM enrichment was 59.5% (125/210). The LLM contributed roughly 30
+percentage points of salary coverage — validating the resume bullet and justifying
+keeping `salary_min`/`salary_max` in the enrichment prompt.
+
+---
+
 ## Known Issues & In-Progress Items
 
 ### In Progress

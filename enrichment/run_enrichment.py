@@ -91,17 +91,18 @@ ORDER BY source, job_id
 
 INSERT_QUERY = """
 INSERT INTO enriched.public.job_enrichment (
-    job_id, source, inferred_seniority, is_title_inflated, inflation_reasoning,
+    job_id, source, inferred_seniority, title_seniority_signal, title_signal_reasoning,
     role_archetype, work_focus, tech_stack_required, tech_stack_preferred,
     paradigms_required, paradigms_preferred, degree_requirement,
     years_required_min, years_required_max, salary_min, salary_max,
+    acknowledges_ai, domain, explicitly_encourages_applicants,
     confidence_score, enriched_at, model_version
 )
 SELECT
     $1, $2, $3, $4, $5, $6, $7,
     PARSE_JSON($8), PARSE_JSON($9), PARSE_JSON($10), PARSE_JSON($11),
-    $12, $13, $14, $15, $16, $17, $18::TIMESTAMP_TZ, $19
-FROM VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::TIMESTAMP_TZ, $22
+FROM VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 
@@ -195,8 +196,8 @@ def write_row(
             job["job_id"],
             job["source"],
             validated.inferred_seniority,
-            validated.is_title_inflated,
-            validated.inflation_reasoning,
+            validated.title_seniority_signal,
+            validated.title_signal_reasoning,
             validated.role_archetype,
             validated.work_focus,
             json.dumps(validated.tech_stack_required),
@@ -208,6 +209,9 @@ def write_row(
             validated.years_required_max,
             validated.salary_min,
             validated.salary_max,
+            validated.acknowledges_ai,
+            validated.domain,
+            validated.explicitly_encourages_applicants,
             validated.confidence_score,
             datetime.now(timezone.utc).isoformat(),
             MODEL_VERSION,
