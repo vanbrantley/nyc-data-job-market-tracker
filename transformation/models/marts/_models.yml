@@ -108,11 +108,32 @@ models:
       - name: work_focus
         description: Primary work focus area inferred by LLM.
 
-      - name: is_title_inflated
-        description: Boolean flag set by LLM when the title appears inflated relative to the actual role.
+      - name: title_seniority_signal
+        description: >
+          LLM assessment of whether the job title accurately reflects the actual
+          seniority of the role. Values: accurate, overstated (title implies more
+          senior than requirements support), understated (requirements exceed what
+          the title implies).
 
-      - name: inflation_reasoning
-        description: LLM explanation for title inflation. Null (~85%) when is_title_inflated is FALSE.
+      - name: title_signal_reasoning
+        description: >
+          LLM explanation for title_seniority_signal. Null when signal is accurate.
+
+      - name: acknowledges_ai
+        description: >
+          Boolean flag indicating whether the job posting explicitly mentions AI,
+          LLMs, or related tools in the context of the role or company's work.
+
+      - name: domain
+        description: >
+          Industry vertical the company operates in (e.g. finance, healthcare,
+          retail, tech, consulting, government). Null for general-purpose or
+          indeterminate roles.
+
+      - name: explicitly_encourages_applicants
+        description: >
+          Boolean flag indicating whether the posting explicitly states that
+          candidates who do not meet every requirement are still encouraged to apply.
 
       - name: tech_stack_required
         description: VARIANT array of required technologies extracted by LLM.
