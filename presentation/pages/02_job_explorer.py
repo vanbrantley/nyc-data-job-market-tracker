@@ -27,10 +27,11 @@ st.caption(
 FILTER_KEYS = [
     "filter_techs", "filter_archetypes", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
-    "filter_salary", "filter_dates", "filter_title", "filter_salary_only"
+    "filter_salary", "filter_dates", "filter_title", "filter_salary_only",
+    "filter_listed_seniority", "filter_title_signal", "filter_domain",
+    "filter_acknowledges_ai", "filter_encourages_applicants",
 ]
 
-# Compute these before the sidebar so pending_clear can reference them
 salary_df = df_full.dropna(subset=["final_salary_min", "final_salary_max"])
 sal_min_overall = int(salary_df["final_salary_min"].min()) if len(salary_df) else 0
 sal_max_overall = min(int(salary_df["final_salary_max"].max()), 300_000) if len(salary_df) else 300_000
@@ -40,7 +41,6 @@ date_max = df_full["date_posted"].max().date() if df_full["date_posted"].notna()
 with st.sidebar:
     st.markdown("### Filters")
 
-    # Reset all filter widgets to defaults on the run after clear is clicked
     if st.session_state.get("pending_clear"):
         st.session_state["filter_techs"] = []
         st.session_state["filter_archetypes"] = []
@@ -52,6 +52,11 @@ with st.sidebar:
         st.session_state["filter_dates"] = (date_min, date_max)
         st.session_state["filter_title"] = ""
         st.session_state["filter_salary_only"] = False
+        st.session_state["filter_listed_seniority"] = []
+        st.session_state["filter_title_signal"] = []
+        st.session_state["filter_domain"] = []
+        st.session_state["filter_acknowledges_ai"] = "All"
+        st.session_state["filter_encourages_applicants"] = "All"
         st.session_state["pending_clear"] = False
 
     # Tech stacks
@@ -79,6 +84,17 @@ with st.sidebar:
         default=[],
         placeholder="All archetypes",
         key="filter_archetypes"
+    )
+
+    # Listed seniority
+    listed_sen_opts = sorted(df_full["listed_seniority"].dropna().unique().tolist())
+    sel_listed_seniority = st.multiselect(
+        "Listed Seniority",
+        options=listed_sen_opts,
+        format_func=format_snake_case,
+        default=[],
+        placeholder="All seniority levels",
+        key="filter_listed_seniority"
     )
 
     # Work model
@@ -112,17 +128,62 @@ with st.sidebar:
         key="filter_sources"
     )
 
+    # Degree requirement
     degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
+    DEGREE_LABELS = {
+        "none": "No Degree Required",
+        "bachelors": "Bachelor's",
+        "masters": "Master's",
+        "equivalent_ok": "Experience Accepted",
+    }
     sel_degrees = st.multiselect(
         "Degree Requirement",
         options=degree_opts,
-        format_func=format_snake_case,
+        format_func=lambda x: DEGREE_LABELS.get(x, format_snake_case(x)),
         default=[],
         placeholder="Any requirement",
         key="filter_degrees"
     )
 
-    # Salary slider — only over rows that have salary data
+    # Domain
+    domain_opts = sorted(df_full["domain"].dropna().unique().tolist())
+    sel_domain = st.multiselect(
+        "Industry",
+        options=domain_opts,
+        format_func=lambda x: x.capitalize(),
+        default=[],
+        placeholder="All industries",
+        key="filter_domain"
+    )
+
+    # Title seniority signal
+    signal_opts = ["accurate", "overstated", "understated"]
+    sel_title_signal = st.multiselect(
+        "Title Seniority Signal",
+        options=signal_opts,
+        format_func=format_snake_case,
+        default=[],
+        placeholder="All",
+        key="filter_title_signal"
+    )
+
+    # Acknowledges AI
+    sel_acknowledges_ai = st.selectbox(
+        "Acknowledges AI",
+        options=["All", "Yes", "No"],
+        index=0,
+        key="filter_acknowledges_ai"
+    )
+
+    # Explicitly encourages applicants
+    sel_encourages = st.selectbox(
+        "Encourages Partial Applicants",
+        options=["All", "Yes", "No"],
+        index=0,
+        key="filter_encourages_applicants"
+    )
+
+    # Salary slider
     salary_range = st.slider(
         "Salary Range (where disclosed)",
         min_value=sal_min_overall,
@@ -175,8 +236,22 @@ if sel_sources:
     df = df[df["source"].isin(sel_sources)]
 if sel_degrees:
     df = df[df["degree_requirement"].isin(sel_degrees)]
+if sel_listed_seniority:
+    df = df[df["listed_seniority"].isin(sel_listed_seniority)]
+if sel_title_signal:
+    df = df[df["title_seniority_signal"].isin(sel_title_signal)]
+if sel_domain:
+    df = df[df["domain"].isin(sel_domain)]
+if sel_acknowledges_ai == "Yes":
+    df = df[df["acknowledges_ai"] == True]
+elif sel_acknowledges_ai == "No":
+    df = df[df["acknowledges_ai"] == False]
+if sel_encourages == "Yes":
+    df = df[df["explicitly_encourages_applicants"] == True]
+elif sel_encourages == "No":
+    df = df[df["explicitly_encourages_applicants"] == False]
 
-# Salary filter — only restrict rows that have salary data; pass through nulls
+# Salary filter
 salary_filter_active = (
     salary_range[0] > sal_min_overall or salary_range[1] < sal_max_overall
 )
@@ -227,8 +302,6 @@ if filtered == 0:
     st.stop()
 
 # ── Grid display ──────────────────────────────────────────────────────────────
-
-# Build display dataframe for the grid
 def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     display = pd.DataFrame()
     display["Title"] = df["job_title"].fillna("—")
@@ -238,51 +311,30 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     display["Work Model"] = df["work_model"].fillna("—")
     display["Source"] = df["source"].apply(lambda x: format_source(x) if pd.notna(x) else "—")
-    # display["Salary"] = df.apply(
-    #     lambda r: format_salary(r["final_salary_min"], r["final_salary_max"]), axis=1
-    # )
     display["sal_min"] = df["final_salary_min"].values
     display["sal_max"] = df["final_salary_max"].values
     display["Posted"] = df["date_posted"].values
-    # Keep job_id as hidden key for row linking
     display["_job_id"] = df["job_id"].values
     display["_idx"] = df.index.values
     return display
 
-
 display_df = make_display_df(df)
-
-# Show grid — hide _job_id and _idx from column display
 visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "sal_min", "sal_max", "Posted"]
 
 st.markdown("#### Postings")
 
-# When the filtered row count changes (i.e. a filter was added/removed/changed),
-# reset the tracked count and increment df_key. Incrementing df_key forces a new
-# widget key on the next render, which Streamlit treats as a brand new widget —
-# discarding any existing internal selection state from the previous filter state.
 if "last_filtered_count" not in st.session_state or st.session_state["last_filtered_count"] != len(df):
     st.session_state["last_filtered_count"] = len(df)
     st.session_state["df_key"] = st.session_state.get("df_key", 0) + 1
 
-# Initialize df_key on very first load before any filter changes have occurred
 if "df_key" not in st.session_state:
     st.session_state["df_key"] = 0
 
-# Build the widget key string for this render. Each time df_key increments,
-# current_key becomes a string Streamlit has never seen before (e.g. "row_selection_2"),
-# meaning it has no existing internal widget state to override our pre-seeded value.
 current_key = f"row_selection_{st.session_state['df_key']}"
 
-# Pre-seed the session state for current_key BEFORE the widget renders.
-# This only runs when current_key is new (i.e. after a filter change or on first load).
-# Streamlit reads this value as the initial selection since the widget is brand new.
-# For already-registered widget keys, Streamlit ignores session state and uses its
-# own internal state — which is why the key has to be fresh for this to work.
 if current_key not in st.session_state:
     st.session_state[current_key] = {"selection": {"rows": [0], "columns": [], "cells": []}}
 
-# Render the display table
 event = st.dataframe(
     display_df[visible_cols].reset_index(drop=True),
     use_container_width=True,
@@ -290,7 +342,7 @@ event = st.dataframe(
     height=320,
     on_select="rerun",
     selection_mode="single-row",
-    key=current_key,  # ties this widget to the pre-seeded session state entry above
+    key=current_key,
     column_config={
         "sal_min": st.column_config.NumberColumn("Sal. Min", format="$%d"),
         "sal_max": st.column_config.NumberColumn("Sal. Max", format="$%d"),
@@ -298,14 +350,8 @@ event = st.dataframe(
     }
 )
 
-# Unpack the selected row index from the event object.
-# Falls back to 0 if nothing is selected (should only happen transiently).
 selected_rows = event.selection.rows if event and event.selection else []
 selected_pos = selected_rows[0] if selected_rows else 0
-
-# Look up the job_id for the selected row, then fetch the full row from df.
-# We go through job_id rather than using selected_pos directly on df to stay
-# robust against index misalignment between display_df and the filtered df.
 selected_job_id = display_df.iloc[selected_pos]["_job_id"]
 job = df[df["job_id"] == selected_job_id].iloc[0]
 
@@ -320,17 +366,19 @@ def tag_pills(items: list, css_class: str = "tag-blue") -> str:
         for t in items if isinstance(t, str)
     )
 
-
 col_left, col_right = st.columns([1.1, 1])
 
 with col_left:
-    # Header
-    inflation_badge = ""
-    if job.get("is_title_inflated"):
-        inflation_badge = ' <span class="tag-pill tag-red">🚩 Title Inflated</span>'
+    # Title signal badge
+    signal = job.get("title_seniority_signal")
+    signal_badge = ""
+    if signal == "overstated":
+        signal_badge = ' <span class="tag-pill tag-red">⬆ Title Overstated</span>'
+    elif signal == "understated":
+        signal_badge = ' <span class="tag-pill tag-green">⬇ Title Understated</span>'
 
     st.markdown(
-        f"<h3 style='margin-bottom:2px'>{job['job_title']}{inflation_badge}</h3>",
+        f"<h3 style='margin-bottom:2px'>{job['job_title']}{signal_badge}</h3>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -345,35 +393,26 @@ with col_left:
         str(job.get("work_model", "")).lower(), "tag-gray"
     )
     et_color = "tag-blue" if str(job.get("employment_type", "")) == "full_time" else "tag-gray"
-    src_color = "tag-purple"
 
     meta_html = (
         f'<span class="tag-pill {wm_color}">{job.get("work_model", "—")}</span>'
         f'<span class="tag-pill {et_color}">{str(job.get("employment_type","—")).replace("_"," ")}</span>'
-        f'<span class="tag-pill {src_color}">{format_source(job.get("source","—"))}</span>'
+        f'<span class="tag-pill tag-purple">{format_source(job.get("source","—"))}</span>'
     )
-    st.markdown(meta_html, unsafe_allow_html=True)
+    if job.get("explicitly_encourages_applicants"):
+        meta_html += ' <span class="tag-pill tag-green">✓ Encourages All Applicants</span>'
+    if job.get("acknowledges_ai"):
+        meta_html += ' <span class="tag-pill tag-blue">🤖 Acknowledges AI</span>'
 
+    st.markdown(meta_html, unsafe_allow_html=True)
     st.markdown("")
 
-    # # Quick stats grid
-    # qc1, qc2, qc3 = st.columns(3)
-    # with qc1:
-    #     st.metric("Salary", format_salary(job.get("final_salary_min"), job.get("final_salary_max")))
-    # with qc2:
-    #     posted = job.get("date_posted")
-    #     st.metric("Posted", posted.strftime("%b %d, %Y") if pd.notna(posted) else "—")
-    # with qc3:
-    #     city = job.get("city")
-    #     state = job.get("state")
-    #     location = f"{city}, {state}" if city and state else (city or state or "Remote / Unknown")
-    #     st.metric("Location", location)
-
+    # Location + salary
     info_col1, info_col2 = st.columns(2)
     with info_col1:
         posted = job.get("date_posted")
         st.markdown(f"**📅 Posted:** {posted.strftime('%b %d, %Y') if pd.notna(posted) else '—'}")
-        st.markdown(f"**💰 Salary:** {format_salary(job.get('final_salary_min'), job.get('final_salary_max')).replace('$', '＄')}")
+        st.markdown(f"**💰 Salary:** {format_salary(job.get('final_salary_min'), job.get('final_salary_max'))}")
     with info_col2:
         city = job.get("city") if pd.notna(job.get("city")) else None
         state = job.get("state") if pd.notna(job.get("state")) else None
@@ -386,6 +425,8 @@ with col_left:
         else:
             location = "Unknown"
         st.markdown(f"**📍 Location:** {location}")
+        domain = job.get("domain")
+        st.markdown(f"**🏢 Industry:** {domain.capitalize() if domain else '—'}")
 
     st.markdown("")
 
@@ -394,7 +435,8 @@ with col_left:
 
     arch = str(job.get("role_archetype") or "—").replace("_", " ").title()
     focus = str(job.get("work_focus") or "—").replace("_", " ").title()
-    seniority = str(job.get("inferred_seniority") or "—").replace("_", " ").title()
+    inferred_sen = str(job.get("inferred_seniority") or "—").replace("_", " ").title()
+    listed_sen = str(job.get("listed_seniority") or "—").replace("_", " ").title()
     degree = str(job.get("degree_requirement") or "—").replace("_", " ").title()
     confidence = job.get("confidence_score")
     conf_str = f"{confidence:.0%}" if pd.notna(confidence) else "—"
@@ -414,16 +456,19 @@ with col_left:
     with enrich_cols[0]:
         st.markdown(f"**Archetype:** {arch}")
         st.markdown(f"**Work Focus:** {focus}")
-        st.markdown(f"**Seniority:** {seniority}")
+        st.markdown(f"**Inferred Seniority:** {inferred_sen}")
+        st.markdown(f"**Listed Seniority:** {listed_sen}")
     with enrich_cols[1]:
         st.markdown(f"**Degree Req:** {degree}")
         st.markdown(f"**YoE Required:** {yoe_str}")
         st.markdown(f"**Confidence:** {conf_str}")
 
-    # Title inflation reasoning
-    if job.get("is_title_inflated") and job.get("inflation_reasoning"):
+    # Title signal reasoning
+    if signal in ("overstated", "understated") and job.get("title_signal_reasoning"):
         st.markdown("")
-        st.warning(f"**Inflation Note:** {job['inflation_reasoning']}", icon="🚩")
+        icon = "🚩" if signal == "overstated" else "💡"
+        label = "Overstated" if signal == "overstated" else "Understated"
+        st.warning(f"**Title Signal ({label}):** {job['title_signal_reasoning']}", icon=icon)
 
     st.markdown("")
 
@@ -431,15 +476,8 @@ with col_left:
     st.markdown("##### 🛠 Tech Stack")
     ts_req = job.get("tech_stack_required") or []
     ts_pref = job.get("tech_stack_preferred") or []
-
-    st.markdown(
-        f"**Required:** {tag_pills(ts_req, 'tag-blue')}",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"**Preferred:** {tag_pills(ts_pref, 'tag-gray')}",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"**Required:** {tag_pills(ts_req, 'tag-blue')}", unsafe_allow_html=True)
+    st.markdown(f"**Preferred:** {tag_pills(ts_pref, 'tag-gray')}", unsafe_allow_html=True)
 
     st.markdown("")
 
@@ -447,15 +485,8 @@ with col_left:
     st.markdown("##### 🧠 Paradigms & Methods")
     par_req = job.get("paradigms_required") or []
     par_pref = job.get("paradigms_preferred") or []
-
-    st.markdown(
-        f"**Required:** {tag_pills(par_req, 'tag-green')}",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"**Preferred:** {tag_pills(par_pref, 'tag-gray')}",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"**Required:** {tag_pills(par_req, 'tag-green')}", unsafe_allow_html=True)
+    st.markdown(f"**Preferred:** {tag_pills(par_pref, 'tag-gray')}", unsafe_allow_html=True)
 
     st.markdown("")
 

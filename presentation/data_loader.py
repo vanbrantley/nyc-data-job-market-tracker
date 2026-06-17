@@ -91,10 +91,19 @@ def load_fct_job_postings() -> pd.DataFrame:
     if "confidence_score" in df.columns:
         df["confidence_score"] = pd.to_numeric(df["confidence_score"], errors="coerce")
 
-    # Normalize boolean
-    if "is_title_inflated" in df.columns:
-        df["is_title_inflated"] = df["is_title_inflated"].apply(
-            lambda x: True if str(x).strip().upper() in ("TRUE", "1", "YES") else False
+    for bool_col in ["acknowledges_ai", "explicitly_encourages_applicants"]:
+        if bool_col in df.columns:
+            df[bool_col] = df[bool_col].apply(
+                lambda x: True if str(x).strip().upper() in ("TRUE", "1", "YES") else False
+            )
+
+    # Derive effective_seniority — combines listed_seniority (TheirStack + Built In)
+    # with is_explicitly_entry_level (JSearch proxy) for a unified seniority field
+    SENIORITY_ORDER = ["entry_level", "junior", "mid_level"]
+    if "listed_seniority" in df.columns and "is_explicitly_entry_level" in df.columns:
+        df["effective_seniority"] = df["listed_seniority"].where(
+            df["listed_seniority"].isin(SENIORITY_ORDER),
+            other=df["is_explicitly_entry_level"].map({True: "entry_level", False: None})
         )
 
     return df

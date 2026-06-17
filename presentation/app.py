@@ -72,6 +72,21 @@ market_insights = st.Page(
     title="Market Insights",
     icon="📈",
 )
+home = st.Page(
+    "pages/00_home.py",
+    title="Home",
+    icon="🏠",
+)
+landscape = st.Page(
+    "pages/01_landscape.py",
+    title="Landscape",
+    icon="🗺️",
+)
+under_the_hood = st.Page(
+    "pages/02_under_the_hood.py",
+    title="Under The Hood",
+    icon="🔬",
+)
 job_explorer = st.Page(
     "pages/02_job_explorer.py",
     title="Job Explorer",
@@ -85,7 +100,8 @@ pipeline_health = st.Page(
 
 pg = st.navigation(
     {
-        "Dashboard": [market_insights, job_explorer, pipeline_health],
+        # "Dashboard": [market_insights, job_explorer, pipeline_health, home, landscape, under_the_hood],
+        "Dashboard": [home, landscape, under_the_hood, job_explorer, pipeline_health],
     }
 )
 

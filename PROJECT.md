@@ -355,26 +355,3 @@ keeping `salary_min`/`salary_max` in the enrichment prompt.
 JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
 
 ---
-
-## v1 Backlog
-
-
-- [ ] Built In backfill (pending IP cooldown + Similar Jobs fix)
-- [ ] Clean up JSearch API filtering -- more strict on query parameters, back filter previous results
-
-- [ ] acknowledges_ai field
-- [ ] Local-only investigation page — `is_local` gate, shows filtered-out jobs for debugging
-- [ ] Investigate/handle "Equivalent Ok" degree requirement
-- [ ] Revisit "Title Inflated" idea and its implementation
-- [ ] Fix seniority charts in Market Insights — currently uses `inferred_seniority`, should use `listed_seniority` where available
-- [ ] Add seniority filter in Job Explorer (entry / junior / mid / unspecified)
-- [ ] Define strategy for API credit exhaustion
-
----
-
-<!-- ## EDA Findings (for portfolio write-up)
-
-- Clean seniority salary ladder in the data
-- 57% title inflation among senior-titled roles
-- $33k median salary gap between traditional and modern stack roles
-- JSearch unlabeled middle (~175 rows) is genuinely ambiguous — mix of true mid-level and untagged entry-level -->

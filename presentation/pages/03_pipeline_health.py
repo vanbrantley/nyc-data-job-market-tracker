@@ -31,8 +31,6 @@ salary_populated = df["final_salary_min"].notna().sum()
 salary_rate = salary_populated / total_rows if total_rows else 0
 tech_stack_populated = df["tech_stack_required"].apply(lambda x: len(x) > 0 if isinstance(x, list) else False).sum()
 tech_stack_rate = tech_stack_populated / total_rows if total_rows else 0
-inflated_count = (df["is_title_inflated"] == True).sum()
-inflation_rate = inflated_count / total_rows if total_rows else 0
 
 latest_ingestion = df["ingested_at"].max()
 latest_str = latest_ingestion.strftime("%b %d, %Y %H:%M UTC") if pd.notna(latest_ingestion) else "—"
@@ -221,45 +219,6 @@ with eq_col2:
         st.plotly_chart(fig_conf, use_container_width=True)
     else:
         st.info("No confidence scores available yet.")
-
-# # ── Title inflation summary ───────────────────────────────────────────────────
-# st.markdown("#### Title Inflation Detector")
-# inf_col1, inf_col2 = st.columns([1, 2])
-
-# with inf_col1:
-#     fig_inf = go.Figure(go.Indicator(
-#         mode="gauge+number",
-#         value=inflation_rate * 100,
-#         title={"text": "Inflation Rate"},
-#         number={"suffix": "%", "font": {"size": 40}},
-#         gauge={
-#             "axis": {"range": [0, 50]},
-#             "bar": {"color": "#ef4444"},
-#             "steps": [
-#                 {"range": [0, 10], "color": "#dcfce7"},
-#                 {"range": [10, 25], "color": "#fef9c3"},
-#                 {"range": [25, 50], "color": "#fee2e2"},
-#             ],
-#             "threshold": {
-#                 "line": {"color": "#991b1b", "width": 3},
-#                 "thickness": 0.75,
-#                 "value": inflation_rate * 100,
-#             },
-#         },
-#     ))
-#     fig_inf.update_layout(height=260, margin=dict(l=20, r=20, t=40, b=0))
-#     st.plotly_chart(fig_inf, use_container_width=True)
-#     st.caption(f"{inflated_count} of {total_rows} postings flagged")
-
-# with inf_col2:
-#     inflated_df = df[df["is_title_inflated"] == True][
-#         ["job_title", "company_name", "role_archetype", "inferred_seniority", "inflation_reasoning"]
-#     ].copy()
-#     inflated_df.columns = ["Title", "Company", "Archetype", "Seniority", "Reasoning"]
-#     if len(inflated_df) > 0:
-#         st.dataframe(inflated_df.reset_index(drop=True), use_container_width=True, height=220, hide_index=True)
-#     else:
-#         st.info("No title inflation detected in current dataset.")
 
 # ── Source health breakdown ───────────────────────────────────────────────────
 st.markdown("#### Source-Level Health")
