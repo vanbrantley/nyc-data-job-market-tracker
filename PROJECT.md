@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-A production data pipeline and dashboard that tracks early-career data job postings in NYC. Built as a primary portfolio piece to demonstrate end-to-end data engineering skills and land an early-career data analyst / analytics engineer / data engineer role.
+A production data pipeline and dashboard that tracks early-career data job postings in NYC. Built as a primary portfolio piece to demonstrate end-to-end data engineering skills and land an early-career data analyst / analytics engineer / data engineer / data scientist role.
 
 **Portfolio lens:** Every architectural decision should be explainable and defensible in an interview. Prefer clean, maintainable patterns over clever ones. Scope is deliberately controlled — shippable beats complete.
 
@@ -49,9 +49,11 @@ nyc-data-job-market-tracker/
 │   ├── notebooks/
 │   │   └── *.ipynb
 │   ├── pages/
-│   │   ├── 01_market_insights.py
-│   │   ├── 02_job_explorer.py
-│   │   └── 03_pipeline_health.py
+│   │   ├── 00_home.py
+│   │   ├── 01_landscape.py
+│   │   ├── 02_under_the_hood.py
+│   │   ├── 03_job_explorer.py
+│   │   └── 04_pipeline_health.py
 │   ├── app.py
 │   ├── data_loader.py
 │   └── requirements.txt
@@ -215,6 +217,7 @@ Final select from `int_jobs_unioned`. No additional logic.
 |---|---|---|
 | `listed_seniority` | STRING | Seniority as labeled by source. Populated for TheirStack and Built In. NULL for JSearch. Values: `entry_level`, `junior`, `mid_level`. |
 | `is_explicitly_entry_level` | BOOLEAN | Title regex flag across all sources: `entry\|junior\|jr\.?\|new.?grad\|early.?career` |
+| `effective_seniority` | STRING | **Derived in `data_loader.py` at runtime** — combines `listed_seniority` with `is_explicitly_entry_level` to produce a unified seniority field across all sources. Values: `entry_level`, `junior`, `mid_level`. **Backlog: move into dbt mart.** |
 
 ### LLM Enrichment Fields
 | Field | Type | Description |
@@ -228,9 +231,12 @@ Final select from `int_jobs_unioned`. No additional logic.
 | `tech_stack_preferred` | VARIANT | Array of preferred technologies |
 | `paradigms_required` | VARIANT | Array of required paradigms |
 | `paradigms_preferred` | VARIANT | Array of preferred paradigms |
-| `degree_requirement` | STRING | `none`, `bachelors`, `masters`, etc. |
+| `degree_requirement` | STRING | `none`, `bachelors`, `masters`, `equivalent_ok` |
 | `years_required_min` | FLOAT | Min years experience |
 | `years_required_max` | FLOAT | Max years experience |
+| `explicitly_encourages_applicants` | BOOLEAN | LLM flag — posting explicitly encourages applicants who don't meet all requirements. Currently fires too liberally — prompt needs tightening. |
+| `title_seniority_signal` | STRING | LLM assessment of whether title accurately reflects role seniority: `accurate`, `overstated`, `understated` |
+| `acknowledges_ai` | BOOLEAN | Whether posting explicitly mentions AI, LLMs, or related tools |
 | `confidence_score` | FLOAT | LLM self-reported confidence (0–1) |
 | `enriched_at` | TIMESTAMP | When enrichment was written |
 | `ingested_at` | TIMESTAMP | When raw payload was written |
@@ -272,10 +278,11 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 ## Streamlit Dashboard
 
 **Pages:**
-1. **Home** — overview and project context
-2. **Market Insights** — charts and EDA findings
-3. **Job Explorer** — filterable grid + expandable detail panel
-4. **Pipeline Health** — API credit tracking, run history
+1. **Home** (`00_home.py`) — framing, the question, the four roles, how the data is collected
+2. **The Landscape** (`01_landscape.py`) — volume, frequency over time, work model, seniority distribution, salary by role type
+3. **Under the Hood** (`02_under_the_hood.py`) — tech stack and paradigm heatmaps, title vs LLM archetype confusion matrix, AI blindspot, experience and degree requirements
+4. **Job Explorer** (`03_job_explorer.py`) — filterable grid + expandable detail panel
+5. **Pipeline Health** (`04_pipeline_health.py`) — API credit tracking, run history
 
 **Key patterns:**
 - `＄` (unicode fullwidth U+FF04) used for salary display — avoids Streamlit LaTeX parsing of `$`
@@ -283,6 +290,7 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 - Dynamic `df_key` incrementing to force dataframe widget re-render on filter change
 - `date_posted` kept as datetime in display dataframe, formatted via `st.column_config.DateColumn` — ensures correct click-to-sort behavior
 - All data loaded via `load_fct_job_postings()` with 1-hour cache
+- `effective_seniority` derived in `data_loader.py` post-load — not a mart column
 
 ---
 
@@ -347,11 +355,19 @@ keeping `salary_min`/`salary_max` in the enrichment prompt.
 - **Built In backfill** — `backfill_builtin_seniority.ipynb` is ready with checkpoint saved. IP needs to cool down before resuming. Run in batches of ~10 with 8–15s delays.
 - **Similar Jobs false positive** — inactive Built In listings show seniority from "Similar Jobs" section instead of returning `not_found`. Need to scope trophy icon search to main job container only, exclude Similar Jobs section.
 
+### Backlog
+- **`effective_seniority` into dbt mart** — currently derived at runtime in `data_loader.py`. Should be moved into `fct_job_postings.sql` so it's queryable directly in Snowflake and testable via dbt. Once done, remove derivation from `data_loader.py` and all dashboard pages.
+- **`run_type` field in `RAW.PIPELINE.RUNS`** — add `scheduled` vs `manual` to distinguish cron-triggered runs from manual re-runs. Pass via GitHub Actions env var (`github.event_name == 'schedule'`). Used to filter manual runs from the frequency over time chart and pipeline health page.
+- **Tighten `explicitly_encourages_applicants` enrichment prompt** — currently fires too liberally. Needs stricter language in `job_extraction.txt` before next re-enrichment run.
+- **Fix `degree_requirement: equivalent_ok` display label** — Job Explorer detail panel shows "Equivalent Ok" — should read "Experience Accepted" to match the intended meaning.
+- **Add Data Scientist ingestion query** — add "Data Scientist in New York" query across all three sources (JSearch, TheirStack, Built In). Dashboard charts group dynamically by `ingestion_query` so DS data will appear automatically once ingested.
+- **Backfill historical data** — use remaining API credits after Thursday's pipeline run to backfill older postings for DS and other queries. Built In: remove `daysSinceUpdated` filter to get full history (~132 results). TheirStack: bypass `discovered_at_gte` high-water mark. JSearch: change `date_posted` parameter. Verify dedup by `job_id` handles any overlap with already-ingested jobs.
+
 ### Known Bugs / Quirks
 - `JOB_ENRICHMENT` table has duplicate `job_id` rows — mitigated by dedup in `int_jobs_unioned.sql` enrichment CTE
 - Built In seniority not in JSON-LD — extracted from HTML, fragile if page structure changes
 - JSearch `job_requirements` filter (`under_3_years_experience`) doesn't reliably exclude senior roles — senior title regex in staging is the real filter
-- API credit tracking (credits_used_this_run) may be slightly overstated when manual 
-JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
+- API credit tracking (`credits_used_this_run`) may be slightly overstated when manual JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
+- **Job Explorer filter reset bug** — clearing filters via sidebar resets the job detail panel to the first job in the list, but the previously selected row remains visually highlighted in the dataframe. The `pending_clear` + `df_key` pattern handles widget state but doesn't fully sync the selection state on clear.
 
 ---
