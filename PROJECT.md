@@ -351,9 +351,12 @@ keeping `salary_min`/`salary_max` in the enrichment prompt.
 
 ## Known Issues & In-Progress Items
 
-### In Progress
-- **Built In backfill** — `backfill_builtin_seniority.ipynb` is ready with checkpoint saved. IP needs to cool down before resuming. Run in batches of ~10 with 8–15s delays.
-- **Similar Jobs false positive** — inactive Built In listings show seniority from "Similar Jobs" section instead of returning `not_found`. Need to scope trophy icon search to main job container only, exclude Similar Jobs section.
+### Known Bugs / Quirks
+- `JOB_ENRICHMENT` table has duplicate `job_id` rows — mitigated by dedup in `int_jobs_unioned.sql` enrichment CTE
+- Built In seniority not in JSON-LD — extracted from HTML, fragile if page structure changes
+- JSearch `job_requirements` filter (`under_3_years_experience`) doesn't reliably exclude senior roles — senior title regex in staging is the real filter
+- API credit tracking (`credits_used_this_run`) may be slightly overstated when manual JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
+- **Job Explorer filter reset bug** — clearing filters via sidebar resets the job detail panel to the first job in the list, but the previously selected row remains visually highlighted in the dataframe. The `pending_clear` + `df_key` pattern handles widget state but doesn't fully sync the selection state on clear.
 
 ### Backlog
 - **`effective_seniority` into dbt mart** — currently derived at runtime in `data_loader.py`. Should be moved into `fct_job_postings.sql` so it's queryable directly in Snowflake and testable via dbt. Once done, remove derivation from `data_loader.py` and all dashboard pages.
@@ -362,12 +365,5 @@ keeping `salary_min`/`salary_max` in the enrichment prompt.
 - **Fix `degree_requirement: equivalent_ok` display label** — Job Explorer detail panel shows "Equivalent Ok" — should read "Experience Accepted" to match the intended meaning.
 - **Add Data Scientist ingestion query** — add "Data Scientist in New York" query across all three sources (JSearch, TheirStack, Built In). Dashboard charts group dynamically by `ingestion_query` so DS data will appear automatically once ingested.
 - **Backfill historical data** — use remaining API credits after Thursday's pipeline run to backfill older postings for DS and other queries. Built In: remove `daysSinceUpdated` filter to get full history (~132 results). TheirStack: bypass `discovered_at_gte` high-water mark. JSearch: change `date_posted` parameter. Verify dedup by `job_id` handles any overlap with already-ingested jobs.
-
-### Known Bugs / Quirks
-- `JOB_ENRICHMENT` table has duplicate `job_id` rows — mitigated by dedup in `int_jobs_unioned.sql` enrichment CTE
-- Built In seniority not in JSON-LD — extracted from HTML, fragile if page structure changes
-- JSearch `job_requirements` filter (`under_3_years_experience`) doesn't reliably exclude senior roles — senior title regex in staging is the real filter
-- API credit tracking (`credits_used_this_run`) may be slightly overstated when manual JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
-- **Job Explorer filter reset bug** — clearing filters via sidebar resets the job detail panel to the first job in the list, but the previously selected row remains visually highlighted in the dataframe. The `pending_clear` + `df_key` pattern handles widget state but doesn't fully sync the selection state on clear.
 
 ---

@@ -14,6 +14,14 @@ from collections import Counter
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from data_loader import load_fct_job_postings, format_salary, format_source, format_snake_case
 
+
+DEGREE_LABELS = {
+    "none": "No Degree Required",
+    "bachelors": "Bachelor's",
+    "masters": "Master's",
+    "equivalent_ok": "Experience Accepted",
+}
+
 # ── Load data ─────────────────────────────────────────────────────────────────
 df_full = load_fct_job_postings()
 
@@ -55,8 +63,8 @@ with st.sidebar:
         st.session_state["filter_listed_seniority"] = []
         st.session_state["filter_title_signal"] = []
         st.session_state["filter_domain"] = []
-        st.session_state["filter_acknowledges_ai"] = "All"
-        st.session_state["filter_encourages_applicants"] = "All"
+        st.session_state["filter_acknowledges_ai"] = False
+        st.session_state["filter_encourages_applicants"] = False
         st.session_state["pending_clear"] = False
 
     # Tech stacks
@@ -130,12 +138,6 @@ with st.sidebar:
 
     # Degree requirement
     degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
-    DEGREE_LABELS = {
-        "none": "No Degree Required",
-        "bachelors": "Bachelor's",
-        "masters": "Master's",
-        "equivalent_ok": "Experience Accepted",
-    }
     sel_degrees = st.multiselect(
         "Degree Requirement",
         options=degree_opts,
@@ -168,18 +170,16 @@ with st.sidebar:
     )
 
     # Acknowledges AI
-    sel_acknowledges_ai = st.selectbox(
+    sel_acknowledges_ai = st.checkbox(
         "Acknowledges AI",
-        options=["All", "Yes", "No"],
-        index=0,
+        value=False,
         key="filter_acknowledges_ai"
     )
 
     # Explicitly encourages applicants
-    sel_encourages = st.selectbox(
-        "Encourages Partial Applicants",
-        options=["All", "Yes", "No"],
-        index=0,
+    sel_encourages = st.checkbox(
+        "Encourages Underqualified Applicants",
+        value=False,
         key="filter_encourages_applicants"
     )
 
@@ -242,14 +242,10 @@ if sel_title_signal:
     df = df[df["title_seniority_signal"].isin(sel_title_signal)]
 if sel_domain:
     df = df[df["domain"].isin(sel_domain)]
-if sel_acknowledges_ai == "Yes":
+if sel_acknowledges_ai:
     df = df[df["acknowledges_ai"] == True]
-elif sel_acknowledges_ai == "No":
-    df = df[df["acknowledges_ai"] == False]
-if sel_encourages == "Yes":
+if sel_encourages:
     df = df[df["explicitly_encourages_applicants"] == True]
-elif sel_encourages == "No":
-    df = df[df["explicitly_encourages_applicants"] == False]
 
 # Salary filter
 salary_filter_active = (
@@ -258,10 +254,10 @@ salary_filter_active = (
 if salary_filter_active:
     has_salary = df["final_salary_min"].notna() & df["final_salary_max"].notna()
     in_salary_range = (
-        (df["final_salary_min"] >= salary_range[0]) &
-        (df["final_salary_max"] <= salary_range[1])
+        (df["final_salary_max"] >= salary_range[0]) &
+        (df["final_salary_min"] <= salary_range[1])
     )
-    df = df[~has_salary | in_salary_range]
+    df = df[has_salary & in_salary_range]
 
 # Date filter
 if date_range and len(date_range) == 2:
@@ -298,6 +294,7 @@ st.markdown(
 )
 
 if filtered == 0:
+    st.session_state["was_empty"] = True
     st.warning("No postings match the current filters.")
     st.stop()
 
@@ -323,8 +320,11 @@ visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "sal_mi
 
 st.markdown("#### Postings")
 
-if "last_filtered_count" not in st.session_state or st.session_state["last_filtered_count"] != len(df):
-    st.session_state["last_filtered_count"] = len(df)
+current_job_ids = tuple(df["job_id"].values)
+current_fingerprint = hash(current_job_ids)
+
+if "last_fingerprint" not in st.session_state or st.session_state["last_fingerprint"] != current_fingerprint:
+    st.session_state["last_fingerprint"] = current_fingerprint
     st.session_state["df_key"] = st.session_state.get("df_key", 0) + 1
 
 if "df_key" not in st.session_state:
@@ -334,6 +334,10 @@ current_key = f"row_selection_{st.session_state['df_key']}"
 
 if current_key not in st.session_state:
     st.session_state[current_key] = {"selection": {"rows": [0], "columns": [], "cells": []}}
+
+if st.session_state.get("was_empty"):
+    st.session_state["was_empty"] = False
+    st.rerun()
 
 event = st.dataframe(
     display_df[visible_cols].reset_index(drop=True),
@@ -426,7 +430,7 @@ with col_left:
             location = "Unknown"
         st.markdown(f"**📍 Location:** {location}")
         domain = job.get("domain")
-        st.markdown(f"**🏢 Industry:** {domain.capitalize() if domain else '—'}")
+        st.markdown(f"**🏢 Industry:** {domain.capitalize() if pd.notna(domain) and domain else '—'}")
 
     st.markdown("")
 
@@ -437,7 +441,8 @@ with col_left:
     focus = str(job.get("work_focus") or "—").replace("_", " ").title()
     inferred_sen = str(job.get("inferred_seniority") or "—").replace("_", " ").title()
     listed_sen = str(job.get("listed_seniority") or "—").replace("_", " ").title()
-    degree = str(job.get("degree_requirement") or "—").replace("_", " ").title()
+    degree_raw = job.get("degree_requirement")
+    degree = DEGREE_LABELS.get(degree_raw, str(degree_raw or "—").replace("_", " ").title())
     confidence = job.get("confidence_score")
     conf_str = f"{confidence:.0%}" if pd.notna(confidence) else "—"
 

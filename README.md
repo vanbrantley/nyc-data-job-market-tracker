@@ -8,9 +8,11 @@ A production data pipeline that tracks early-career data job postings in New Yor
 
 ## What It Does
 
-The NYC job market for data roles is noisy. Job titles are inflated, seniority labels are inconsistent, and raw postings bury the signal in walls of boilerplate. This pipeline cuts through that: it collects every relevant entry- and mid-level posting it can find, then sends each description through an LLM to extract structured, comparable metadata — actual tech stack, inferred seniority, title inflation flags, salary estimates, role archetype — and presents it all in a filterable dashboard built for analysis, not browsing.
+The NYC job market for data roles is noisy. Job titles are inflated, seniority labels are inconsistent, and raw postings bury the signal in walls of boilerplate. Worse, the lines between role types are blurry — "Analytics Engineer" and "Data Engineer" postings often describe nearly identical work under different names.
 
-Targets three role archetypes across all postings: **Data Analyst**, **Analytics Engineer**, **Data Engineer**.
+This pipeline cuts through that: it collects every relevant entry- and mid-level posting it can find, then sends each description through an LLM to extract structured, comparable metadata — actual tech stack, inferred seniority, role archetype, AI awareness, title accuracy — and presents it all in a dashboard built to compare what a job is *called* against what it actually *is*.
+
+Targets four role archetypes across all postings: **Data Analyst**, **Analytics Engineer**, **Data Engineer**, and **Data Scientist**.
 
 ---
 
@@ -18,7 +20,7 @@ Targets three role archetypes across all postings: **Data Analyst**, **Analytics
 
 ```
 INGESTION  (GitHub Actions cron — every Monday & Thursday)
-├── JSearch (RapidAPI)       → cursor-paginated search, 3 queries × 6 pages
+├── JSearch (RapidAPI)       → cursor-paginated search, N queries × 6 pages
 ├── TheirStack               → two-stage free-sweep → paid-fetch (credit-budgeted)
 └── Built In NYC             → two-stage crawl → scrape (BeautifulSoup, JSON-LD)
                                           ↓
@@ -30,7 +32,8 @@ SNOWFLAKE RAW               (strict ELT — VARIANT columns, no transformation a
 ENRICHMENT                  (GPT-4o-mini, runs sequentially post-ingest)
     Pulls unenriched rows from all three raw tables
     Extracts: role_archetype · work_focus · tech_stack (required/preferred)
-              paradigms · degree_requirement · salary · seniority · title inflation
+              paradigms · degree_requirement · salary · seniority
+              title_seniority_signal · acknowledges_ai · explicitly_encourages_applicants
     Validates with Pydantic before writing
     → ENRICHED.PUBLIC.JOB_ENRICHMENT
                                           ↓
@@ -43,7 +46,7 @@ dbt TRANSFORMATION          (runs after enrichment in same GitHub Actions job)
                     final wide table powering the dashboard
                                           ↓
 PRESENTATION                (Streamlit — live dashboard)
-    Market Insights · Job Explorer · Pipeline Health
+    Home · The Landscape · Under the Hood · Job Explorer · Pipeline Health
 ```
 
 ---
@@ -67,7 +70,7 @@ PRESENTATION                (Streamlit — live dashboard)
 Every ingestion client writes three fields to Snowflake: `SOURCE`, `RAW_PAYLOAD` (the full raw JSON dict, untouched), and `INGESTED_AT`. No transformation happens at ingest time. dbt handles all field extraction downstream via Snowflake's dot-notation semi-structured access (`RAW_PAYLOAD:job_title::STRING`). This means ingestion bugs never corrupt data — the raw truth is always preserved and replayable.
 
 ### Credit-budgeted TheirStack two-stage architecture
-TheirStack charges per job returned. To avoid burning the monthly credit budget on duplicates, the client runs a **free sweep** first — paginating through all matching jobs with `blur_company_data=True` (zero cost) to collect IDs. It then **deduplicates in memory** using a `(job_title, location, frozenset(technology_slugs))` fingerprint, then fetches only the top `N` unique IDs via the paid endpoint. Each role archetype (Data Analyst, Analytics Engineer, Data Engineer) gets its own cap so no single category crowds out the others.
+TheirStack charges per job returned. To avoid burning the monthly credit budget on duplicates, the client runs a **free sweep** first — paginating through all matching jobs with `blur_company_data=True` (zero cost) to collect IDs. It then **deduplicates in memory** using a `(job_title, location, frozenset(technology_slugs))` fingerprint, then fetches only the top `N` unique IDs via the paid endpoint. Each role archetype gets its own cap so no single category crowds out the others.
 
 ### Cross-source deduplication at two layers
 The same job posting often appears on multiple boards. Deduplication runs at two layers:
@@ -75,10 +78,16 @@ The same job posting often appears on multiple boards. Deduplication runs at two
 2. **Cross-source** (intermediate model): `ROW_NUMBER() OVER (PARTITION BY LOWER(title) || ' | ' || LOWER(company))` — handles the same job appearing on JSearch, TheirStack, and Built In simultaneously. Source priority is `builtin > theirstack > jsearch` since Built In provides the richest structured payload.
 
 ### LLM enrichment with structured output + Pydantic validation
-The enrichment pipeline sends each job title + description to GPT-4o-mini with a strict system prompt that requests a JSON object conforming to a predefined schema. The response is immediately validated through a Pydantic model (`JobEnrichmentSchema`) before writing — if validation fails, the row is retried up to 3 times before being skipped. Temperature is set to 0 for reproducibility. Fields extracted include: `role_archetype`, `work_focus`, `inferred_seniority`, `is_title_inflated` (with free-text reasoning), `tech_stack_required/preferred`, `paradigms_required/preferred`, `degree_requirement`, `years_required_min/max`, and `salary_min/max`.
+The enrichment pipeline sends each job title + description to GPT-4o-mini with a strict system prompt that requests a JSON object conforming to a predefined schema. The response is immediately validated through a Pydantic model (`JobEnrichmentSchema`) before writing — if validation fails, the row is retried up to 3 times before being skipped. Temperature is set to 0 for reproducibility. Fields extracted include: `role_archetype`, `work_focus`, `inferred_seniority`, `title_seniority_signal`, `tech_stack_required/preferred`, `paradigms_required/preferred`, `degree_requirement`, `years_required_min/max`, `acknowledges_ai`, `explicitly_encourages_applicants`, and `salary_min/max`.
+
+### Listed title vs. LLM-assigned archetype
+Every posting carries two independent labels: `ingestion_query` (the title the job was searched/listed under) and `role_archetype` (what the LLM determined the role actually is, based on the full description). Comparing the two — rather than collapsing them into one — is what surfaces title inflation and role convergence. This comparison is the core analytical mechanism behind the Under the Hood dashboard page.
+
+### Effective seniority — unifying inconsistent source labels
+Only TheirStack and Built In provide a structured `listed_seniority` field; JSearch does not. To avoid silently dropping a third of postings from seniority-based analysis, an `effective_seniority` field falls back to a title-regex-derived `is_explicitly_entry_level` flag when `listed_seniority` is null. Currently computed at runtime in the dashboard's data loader — slated to move into the dbt mart.
 
 ### Salary: structured payload takes precedence over LLM estimate
-Not all sources include structured salary fields. The mart model uses `COALESCE(structured_salary, llm_extracted_salary)` — structured payload values (from JSearch and Built In JSON-LD) are trusted first; LLM-extracted salary from description text fills gaps. This is surfaced as `final_salary_min` / `final_salary_max` in the fact table.
+Not all sources include structured salary fields. The mart model uses `COALESCE(structured_salary, llm_extracted_salary)` — structured payload values (from JSearch and Built In JSON-LD) are trusted first; LLM-extracted salary from description text fills gaps. This is surfaced as `final_salary_min` / `final_salary_max` in the fact table. Validation against structured-only coverage showed the LLM layer contributes roughly 30 percentage points of additional salary coverage.
 
 ### dbt materialization strategy
 - **Staging models** → Views: no storage cost, always fresh off RAW
@@ -95,7 +104,11 @@ After each run, credit balance and usage stats for JSearch (from rate-limit resp
 
 ## Dashboard Pages
 
-**Market Insights** — Aggregate view of what the NYC data job market is actually asking for: top required skills (color-coded modern vs traditional stack), work model breakdown, seniority ladder (do years required and salary actually stratify by level?), title inflation rate by seniority level, and the salary gap between modern-stack and traditional-stack roles.
+**Home** — The framing for the investigation: why this project exists, the four role types under examination, and how the data is collected.
+
+**The Landscape** — What does the market look like right now? Posting volume by role type, cumulative frequency over time, work model split, seniority distribution, and salary by role type and seniority.
+
+**Under the Hood** — What are these roles actually asking for? Tech stack and paradigm overlap heatmaps across role types, a confusion matrix comparing listed title against LLM-assigned archetype, AI acknowledgment rate by role, and experience/degree requirements broken out by role and seniority.
 
 **Job Explorer** — Every posting, filterable by tech stack, role archetype, work model, employment type, source, degree requirement, salary range, and date posted. Selecting any row opens a detail panel showing the full LLM enrichment alongside the raw job description — the exact text the model extracted from, so you can validate the extraction.
 
@@ -125,9 +138,11 @@ nyc-data-job-market-tracker/
 │   ├── app.py                  # Streamlit entry point
 │   ├── data_loader.py          # Snowflake → DataFrame loader
 │   └── pages/
-│       ├── 01_market_insights.py
-│       ├── 02_job_explorer.py
-│       └── 03_pipeline_health.py
+│       ├── 00_home.py
+│       ├── 01_landscape.py
+│       ├── 02_under_the_hood.py
+│       ├── 03_job_explorer.py
+│       └── 04_pipeline_health.py
 ├── infra/
 │   ├── snowflake_client.py     # SnowflakeLoader — routes rows to RAW tables
 │   └── snowflake_setup.sql

@@ -96,29 +96,29 @@ def run_pipeline() -> bool:
     failures: list[str] = []
 
     with SnowflakeLoader() as loader:
-        # # ------------------------------------------------------------------ #
-        # # 1. JSearch — collect then immediately load
-        # # ------------------------------------------------------------------ #
-        # try:
-        #     results["jsearch"] = jsearch_client.fetch_all(
-        #         queries=JSEARCH_QUERIES,
-        #         date_posted="3days",
-        #     )
-        #     log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
-        # except Exception as e:
-        #     log.error(f"JSearch source FAILED: {e}", exc_info=True)
-        #     failures.append("jsearch")
+        # ------------------------------------------------------------------ #
+        # 1. JSearch — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            results["jsearch"] = jsearch_client.fetch_all(
+                queries=JSEARCH_QUERIES,
+                date_posted="3days",
+            )
+            log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
+        except Exception as e:
+            log.error(f"JSearch source FAILED: {e}", exc_info=True)
+            failures.append("jsearch")
 
-        # try:
-        #     if results["jsearch"]:
-        #         load_results = loader.load(results["jsearch"])
-        #         for table, count in load_results.items():
-        #             log.info(f"  {table}: {count} rows inserted.")
-        #     else:
-        #         log.warning("JSearch — no rows to load, skipping Snowflake write.")
-        # except Exception as e:
-        #     log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
-        #     failures.append("jsearch_snowflake")
+        try:
+            if results["jsearch"]:
+                load_results = loader.load(results["jsearch"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("JSearch — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("jsearch_snowflake")
 
         # ------------------------------------------------------------------ #
         # 2. TheirStack — collect then immediately load
