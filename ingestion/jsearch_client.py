@@ -38,8 +38,9 @@ RAPIDAPI_HOST = "jsearch.p.rapidapi.com"
 # 200 credits/month, runs every 3 days (~10 runs/month),
 # 3 queries per run → 6 pages per query = 180 credits max.
 # Leaves 20 for debugging/reruns.
-MAX_PAGES_PER_QUERY = 6
+# MAX_PAGES_PER_QUERY = 6
 # MAX_PAGES_PER_QUERY = 1  # for testing
+MAX_PAGES_PER_QUERY = 20  # for data scientist backfill
 
 RESULTS_PER_PAGE = 10  # JSearch default; not configurable on free tier
 MAX_RETRIES = 3
@@ -47,7 +48,7 @@ RETRY_BACKOFF_BASE = 2  # seconds; doubles on each retry (2, 4, 8)
 REQUEST_TIMEOUT = 30  # seconds
 
 RELEVANT_TITLE_PATTERN = re.compile(
-            r'data analyst|data engineer|analytics engineer',
+            r'data analyst|data engineer|analytics engineer|data scientist',
             re.IGNORECASE
         )
 
@@ -102,7 +103,7 @@ class JSearchClient:
     def fetch_all(
         self,
         queries: list[str],
-        date_posted: str = "3days",
+        date_posted: str = "month",
     ) -> list[dict]:
         """
         Fetch jobs for every query in the list, paginating each with

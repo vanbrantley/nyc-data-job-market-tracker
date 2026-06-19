@@ -8,7 +8,7 @@ The JSON must conform to this exact schema:
   "inferred_seniority": <"entry" | "mid" | "senior">,
   "title_seniority_signal": <"accurate" | "overstated" | "understated">,
   "title_signal_reasoning": <string — 1-2 sentences or null if accurate>,
-  "role_archetype": <"data_analyst" | "analytics_engineer" | "data_engineer" | "hybrid" | "software_engineer">,
+  "role_archetype": <"data_analyst" | "analytics_engineer" | "data_engineer" | "data_scientist" | "hybrid" | "software_engineer">,
   "work_focus": <string — short phrase describing primary day-to-day work, max 8 words>,
   "tech_stack_required": <array of lowercase strings — tools explicitly required>,
   "tech_stack_preferred": <array of lowercase strings — tools listed as preferred or nice to have>,
@@ -43,6 +43,9 @@ role_archetype: the primary operational reality of the role.
   data_analyst = focused on querying, reporting, and business insights
   analytics_engineer = focused on data modeling, transformation, and serving clean data to analysts
   data_engineer = focused on building and maintaining pipelines and infrastructure
+  data_scientist = focused on statistical modeling, experimentation, or machine learning
+    to answer questions or build predictive systems — distinct from analytics_engineer
+    (which serves clean data) and data_analyst (which reports on existing data)
   hybrid = genuinely split between two or more data role types with no clear primary
   software_engineer = primarily a software engineering role with minimal data focus
 
@@ -108,22 +111,35 @@ explicitly_encourages_applicants: true ONLY if the posting explicitly invites ca
   This is true regardless of how that sentence is worded — it is about legal compliance
   and demographic inclusion, never about a candidate's qualifications.
 
+  ALSO NOT SUFFICIENT: generic enthusiasm or culture language with no qualifications
+  gap named (e.g. "if you're passionate about this work and ready for a challenging
+  role, we encourage you to apply"). Passion, attitude, or excitement are not
+  qualifications — this is false unless a specific gap is also named.
+
+  Read the ENTIRE posting, not just sentences containing "encourage" or "invite". The
+  qualifications-gap statement does not need to appear in the same sentence as those
+  words. For example, "we welcome candidates from all backgrounds, including recent
+  graduates without prior technical experience" is true even without the word
+  "encourage" appearing nearby — it explicitly names a real qualifications gap
+  (no prior technical experience) and says those candidates are welcome.
+
   true examples (the actual signal — a qualifications/experience gap):
     "we encourage you to apply even if you don't meet every qualification"
     "if you don't match every criteria, we encourage you to apply"
     "if your experience doesn't align perfectly with the job description, apply anyway"
     "not everyone will meet all the qualifications on day one — apply anyway"
+    "we welcome recent graduates without prior technical experience"
 
   false examples (look similar, but are NOT this signal):
     "all qualified individuals are encouraged to apply" (EEO boilerplate — ALWAYS false)
     "we encourage candidates of all backgrounds to apply" (diversity, not qualifications)
     "we are an equal opportunity employer" (legal boilerplate)
     "reliable and detail-oriented candidates are encouraged to apply" (generic, no gap stated)
-    "if you're passionate about this work, we encourage you to apply" (enthusiasm, no gap stated)
+    "if you're passionate about this work and ready for a challenging role, apply" (enthusiasm only, no gap stated)
 
   The word "encourage" alone is NEVER sufficient. The posting must name or imply a
-  GAP between the candidate's actual qualifications and the listed requirements.
-  When in doubt, default to false. This field should be rare.
+  GAP between the candidate's actual qualifications and the listed requirements,
+  somewhere in the text. When in doubt, default to false. This field should be rare.
 
 confidence_score: your confidence that the extraction is accurate given description quality.
   penalize heavily for vague, templated, or very short descriptions

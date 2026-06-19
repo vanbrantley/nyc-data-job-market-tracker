@@ -21,25 +21,25 @@ logging.basicConfig(
 log = logging.getLogger("orchestrator")
 
 JSEARCH_QUERIES = [
-    "Data Analyst in New York",
-    "Analytics Engineer in New York",
-    "Data Engineer in New York",
+    # "Data Analyst in New York",
+    # "Analytics Engineer in New York",
+    # "Data Engineer in New York",
     "Data Scientist in New York",
 ]
 
 THEIRSTACK_CONFIGS = [
-    {
-        "label": "Data Analyst",
-        "job_title_pattern_or": ["(?i)data analyst"],
-    },
-    {
-        "label": "Analytics Engineer",
-        "job_title_pattern_or": ["(?i)analytics engineer"],
-    },
-    {
-        "label": "Data Engineer",
-        "job_title_pattern_or": ["(?i)data engineer"],
-    },
+    # {
+    #     "label": "Data Analyst",
+    #     "job_title_pattern_or": ["(?i)data analyst"],
+    # },
+    # {
+    #     "label": "Analytics Engineer",
+    #     "job_title_pattern_or": ["(?i)analytics engineer"],
+    # },
+    # {
+    #     "label": "Data Engineer",
+    #     "job_title_pattern_or": ["(?i)data engineer"],
+    # },
     {
         "label": "Data Scientist",
         "job_title_pattern_or": ["(?i)data scientist"],
@@ -47,9 +47,9 @@ THEIRSTACK_CONFIGS = [
 ]
 
 BUILTIN_CONFIGS = [
-    {"label": "Data Analyst", "search_term": "Data+Analyst"},
-    {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
-    {"label": "Data Engineer", "search_term": "Data+Engineer"},
+    # {"label": "Data Analyst", "search_term": "Data+Analyst"},
+    # {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
+    # {"label": "Data Engineer", "search_term": "Data+Engineer"},
     {"label": "Data Scientist", "search_term": "Data+Scientist"},
 ]
 
@@ -108,7 +108,7 @@ def run_pipeline() -> bool:
         try:
             results["jsearch"] = jsearch_client.fetch_all(
                 queries=JSEARCH_QUERIES,
-                date_posted="3days",
+                date_posted="month",
             )
             log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
         except Exception as e:
@@ -138,6 +138,10 @@ def run_pipeline() -> bool:
                     f"Could not fetch TheirStack high-water mark: {e}. "
                     f"Falling back to full 7-day window."
                 )
+
+            # TEMP: forced None for one-off DS backfill — delete this line
+            # to restore high-water-mark behavior.
+            discovered_at_gte = None
 
             results["theirstack"] = theirstack_client.fetch_all(
                 configs=THEIRSTACK_CONFIGS,

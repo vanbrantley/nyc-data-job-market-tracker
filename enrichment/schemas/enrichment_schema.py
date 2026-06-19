@@ -10,6 +10,7 @@ class JobEnrichmentSchema(BaseModel):
         "data_analyst",
         "analytics_engineer",
         "data_engineer",
+        "data_scientist",
         "hybrid",
         "software_engineer",
     ]
