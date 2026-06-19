@@ -224,19 +224,77 @@ class TheirStackClient:
 
         return self._to_snowflake_rows(paid_jobs, label=config["label"])
 
+    # def _free_sweep(
+    #     self,
+    #     search_body: dict[str, Any],
+    #     discovered_at_gte: str | None = None,
+    # ) -> list[dict]:
+    #     """
+    #     Paginate through ALL matching jobs with blur_company_data=True.
+    #     Costs zero credits regardless of how many pages are fetched.
+    #     """
+    #     all_jobs: list[dict] = []
+    #     page = 0
+
+    #     while True:
+    #         body: dict[str, Any] = {
+    #             **search_body,
+    #             "blur_company_data": True,
+    #             "include_total_results": page == 0,
+    #             "limit": FREE_SWEEP_PAGE_SIZE,
+    #             "page": page,
+    #         }
+
+    #         if discovered_at_gte:
+    #             body["discovered_at_gte"] = discovered_at_gte
+
+    #         log.info(f"    Free sweep page {page} — zero credits.")
+    #         data = self._post(body)
+
+    #         if page == 0:
+    #             total = data.get("metadata", {}).get("total_results", "?")
+    #             log.info(f"    TheirStack reports {total} total matching jobs.")
+
+    #         page_jobs = data.get("data", [])
+
+    #         if not page_jobs:
+    #             log.info("    Empty page — sweep complete.")
+    #             break
+
+    #         all_jobs.extend(page_jobs)
+    #         log.info(
+    #             f"    Page {page}: {len(page_jobs)} jobs collected "
+    #             f"(running total: {len(all_jobs)})."
+    #         )
+
+    #         if len(page_jobs) < FREE_SWEEP_PAGE_SIZE:
+    #             log.info("    Partial page — reached last page.")
+    #             break
+
+    #         page += 1
+
+    #     return all_jobs
+    
     def _free_sweep(
         self,
         search_body: dict[str, Any],
         discovered_at_gte: str | None = None,
+        max_free_sweep_pages: int = 4,
     ) -> list[dict]:
         """
         Paginate through ALL matching jobs with blur_company_data=True.
         Costs zero credits regardless of how many pages are fetched.
+
+        Capped at max_free_sweep_pages — TheirStack appears to return HTTP 403
+        on deep free-sweep pagination (observed failing consistently at page 5,
+        ~125+ cumulative jobs, undocumented in their API rate-limit docs).
+        Stopping one page early avoids losing all jobs collected so far to an
+        unhandled exception.
         """
         all_jobs: list[dict] = []
         page = 0
 
-        while True:
+        while page < max_free_sweep_pages: 
             body: dict[str, Any] = {
                 **search_body,
                 "blur_company_data": True,
