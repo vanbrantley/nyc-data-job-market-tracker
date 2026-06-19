@@ -24,6 +24,7 @@ JSEARCH_QUERIES = [
     "Data Analyst in New York",
     "Analytics Engineer in New York",
     "Data Engineer in New York",
+    "Data Scientist in New York",
 ]
 
 THEIRSTACK_CONFIGS = [
@@ -39,12 +40,17 @@ THEIRSTACK_CONFIGS = [
         "label": "Data Engineer",
         "job_title_pattern_or": ["(?i)data engineer"],
     },
+    {
+        "label": "Data Scientist",
+        "job_title_pattern_or": ["(?i)data scientist"],
+    },
 ]
 
 BUILTIN_CONFIGS = [
     {"label": "Data Analyst", "search_term": "Data+Analyst"},
     {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
     {"label": "Data Engineer", "search_term": "Data+Engineer"},
+    {"label": "Data Scientist", "search_term": "Data+Scientist"},
 ]
 
 def calc_credits_this_run(

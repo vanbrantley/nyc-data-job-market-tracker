@@ -96,9 +96,31 @@ domain: the industry vertical the company operates in. Use a short lowercase str
   "media", "real estate", "education", "logistics"
   null if the role is at a general-purpose tech company or domain is not determinable.
 
-explicitly_encourages_applicants: true if the posting explicitly states that candidates
-  who do not meet every requirement are still encouraged to apply.
-  false otherwise.
+explicitly_encourages_applicants: true ONLY if the posting explicitly invites candidates
+  who do not fully meet the listed qualifications, requirements, or experience level to
+  apply anyway. This is a statement about a SKILLS/EXPERIENCE GAP — not about identity,
+  background, diversity, or general enthusiasm.
+
+  true examples (the actual signal — a qualifications gap):
+    "we encourage you to apply even if you don't meet every qualification"
+    "if you don't match every criteria, we encourage you to apply"
+    "if your experience doesn't align perfectly with the job description, apply anyway"
+    "you don't need to check every box to apply"
+
+  false examples (look similar, but are NOT a qualifications-gap statement):
+    "all qualified individuals are encouraged to apply" (generic EEO boilerplate)
+    "we encourage candidates of all backgrounds to apply" (about diversity, not qualifications)
+    "applicants are encouraged to include salary expectations" (unrelated use of "encourage")
+    "if you're passionate about data, we want to hear from you" (general enthusiasm, no qualifications waiver)
+    "we are an equal opportunity employer" (legal boilerplate, not an invitation)
+
+  ambiguous (default to false unless qualifications are explicitly named):
+    "we welcome applicants with transferable skills" (vague — does NOT name specific
+      qualifications being waived, so default false)
+
+  The word "encourage" alone is NOT sufficient — it must be specifically tied to
+  qualifications, requirements, or experience level. When in doubt, default to false.
+  This field should be rare across most postings.
 
 confidence_score: your confidence that the extraction is accurate given description quality.
   penalize heavily for vague, templated, or very short descriptions
