@@ -98,29 +98,32 @@ domain: the industry vertical the company operates in. Use a short lowercase str
 
 explicitly_encourages_applicants: true ONLY if the posting explicitly invites candidates
   who do not fully meet the listed qualifications, requirements, or experience level to
-  apply anyway. This is a statement about a SKILLS/EXPERIENCE GAP — not about identity,
-  background, diversity, or general enthusiasm.
+  apply anyway — a SKILLS/EXPERIENCE GAP statement specifically.
 
-  true examples (the actual signal — a qualifications gap):
+  CRITICAL EXCLUSION: Generic equal-opportunity-employer language is NEVER this signal,
+  even though it also uses the words "encourage" and "apply". If the only "encourage to
+  apply" language in the posting is part of an EEO/equal-opportunity statement (e.g.
+  "all qualified individuals are encouraged to apply", "we are an equal opportunity
+  employer and encourage applications from all backgrounds"), the answer is false.
+  This is true regardless of how that sentence is worded — it is about legal compliance
+  and demographic inclusion, never about a candidate's qualifications.
+
+  true examples (the actual signal — a qualifications/experience gap):
     "we encourage you to apply even if you don't meet every qualification"
     "if you don't match every criteria, we encourage you to apply"
     "if your experience doesn't align perfectly with the job description, apply anyway"
-    "you don't need to check every box to apply"
+    "not everyone will meet all the qualifications on day one — apply anyway"
 
-  false examples (look similar, but are NOT a qualifications-gap statement):
-    "all qualified individuals are encouraged to apply" (generic EEO boilerplate)
-    "we encourage candidates of all backgrounds to apply" (about diversity, not qualifications)
-    "applicants are encouraged to include salary expectations" (unrelated use of "encourage")
-    "if you're passionate about data, we want to hear from you" (general enthusiasm, no qualifications waiver)
-    "we are an equal opportunity employer" (legal boilerplate, not an invitation)
+  false examples (look similar, but are NOT this signal):
+    "all qualified individuals are encouraged to apply" (EEO boilerplate — ALWAYS false)
+    "we encourage candidates of all backgrounds to apply" (diversity, not qualifications)
+    "we are an equal opportunity employer" (legal boilerplate)
+    "reliable and detail-oriented candidates are encouraged to apply" (generic, no gap stated)
+    "if you're passionate about this work, we encourage you to apply" (enthusiasm, no gap stated)
 
-  ambiguous (default to false unless qualifications are explicitly named):
-    "we welcome applicants with transferable skills" (vague — does NOT name specific
-      qualifications being waived, so default false)
-
-  The word "encourage" alone is NOT sufficient — it must be specifically tied to
-  qualifications, requirements, or experience level. When in doubt, default to false.
-  This field should be rare across most postings.
+  The word "encourage" alone is NEVER sufficient. The posting must name or imply a
+  GAP between the candidate's actual qualifications and the listed requirements.
+  When in doubt, default to false. This field should be rare.
 
 confidence_score: your confidence that the extraction is accurate given description quality.
   penalize heavily for vague, templated, or very short descriptions
