@@ -342,9 +342,9 @@ class TheirStackClient:
 
         for job in jobs:
             fingerprint = (
-                job.get("job_title", "").lower().strip(),
-                job.get("short_location", "").lower().strip(),
-                frozenset(job.get("technology_slugs", [])),
+                (job.get("job_title") or "").lower().strip(),
+                (job.get("short_location") or "").lower().strip(),
+                frozenset(job.get("technology_slugs") or []),
             )
             fingerprint_groups[fingerprint].append(job)
 
