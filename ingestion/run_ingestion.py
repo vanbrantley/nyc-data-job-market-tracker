@@ -21,25 +21,25 @@ logging.basicConfig(
 log = logging.getLogger("orchestrator")
 
 JSEARCH_QUERIES = [
-    # "Data Analyst in New York",
-    # "Analytics Engineer in New York",
-    # "Data Engineer in New York",
+    "Data Analyst in New York",
+    "Analytics Engineer in New York",
+    "Data Engineer in New York",
     "Data Scientist in New York",
 ]
 
 THEIRSTACK_CONFIGS = [
-    # {
-    #     "label": "Data Analyst",
-    #     "job_title_pattern_or": ["(?i)data analyst"],
-    # },
-    # {
-    #     "label": "Analytics Engineer",
-    #     "job_title_pattern_or": ["(?i)analytics engineer"],
-    # },
-    # {
-    #     "label": "Data Engineer",
-    #     "job_title_pattern_or": ["(?i)data engineer"],
-    # },
+    {
+        "label": "Data Analyst",
+        "job_title_pattern_or": ["(?i)data analyst"],
+    },
+    {
+        "label": "Analytics Engineer",
+        "job_title_pattern_or": ["(?i)analytics engineer"],
+    },
+    {
+        "label": "Data Engineer",
+        "job_title_pattern_or": ["(?i)data engineer"],
+    },
     {
         "label": "Data Scientist",
         "job_title_pattern_or": ["(?i)data scientist"],
@@ -47,9 +47,9 @@ THEIRSTACK_CONFIGS = [
 ]
 
 BUILTIN_CONFIGS = [
-    # {"label": "Data Analyst", "search_term": "Data+Analyst"},
-    # {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
-    # {"label": "Data Engineer", "search_term": "Data+Engineer"},
+    {"label": "Data Analyst", "search_term": "Data+Analyst"},
+    {"label": "Analytics Engineer", "search_term": "Analytics+Engineer"},
+    {"label": "Data Engineer", "search_term": "Data+Engineer"},
     {"label": "Data Scientist", "search_term": "Data+Scientist"},
 ]
 
@@ -102,29 +102,29 @@ def run_pipeline() -> bool:
     failures: list[str] = []
 
     with SnowflakeLoader() as loader:
-        # # ------------------------------------------------------------------ #
-        # # 1. JSearch — collect then immediately load
-        # # ------------------------------------------------------------------ #
-        # try:
-        #     results["jsearch"] = jsearch_client.fetch_all(
-        #         queries=JSEARCH_QUERIES,
-        #         date_posted="month",
-        #     )
-        #     log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
-        # except Exception as e:
-        #     log.error(f"JSearch source FAILED: {e}", exc_info=True)
-        #     failures.append("jsearch")
+        # ------------------------------------------------------------------ #
+        # 1. JSearch — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            results["jsearch"] = jsearch_client.fetch_all(
+                queries=JSEARCH_QUERIES,
+                date_posted="3days",
+            )
+            log.info(f"JSearch — {len(results['jsearch'])} rows collected.")
+        except Exception as e:
+            log.error(f"JSearch source FAILED: {e}", exc_info=True)
+            failures.append("jsearch")
 
-        # try:
-        #     if results["jsearch"]:
-        #         load_results = loader.load(results["jsearch"])
-        #         for table, count in load_results.items():
-        #             log.info(f"  {table}: {count} rows inserted.")
-        #     else:
-        #         log.warning("JSearch — no rows to load, skipping Snowflake write.")
-        # except Exception as e:
-        #     log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
-        #     failures.append("jsearch_snowflake")
+        try:
+            if results["jsearch"]:
+                load_results = loader.load(results["jsearch"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("JSearch — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"JSearch Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("jsearch_snowflake")
 
         # ------------------------------------------------------------------ #
         # 2. TheirStack — collect then immediately load
@@ -138,10 +138,6 @@ def run_pipeline() -> bool:
                     f"Could not fetch TheirStack high-water mark: {e}. "
                     f"Falling back to full 7-day window."
                 )
-
-            # TEMP: forced None for one-off DS backfill — delete this line
-            # to restore high-water-mark behavior.
-            discovered_at_gte = None
 
             results["theirstack"] = theirstack_client.fetch_all(
                 configs=THEIRSTACK_CONFIGS,
@@ -163,26 +159,26 @@ def run_pipeline() -> bool:
             log.error(f"TheirStack Snowflake load FAILED: {e}", exc_info=True)
             failures.append("theirstack_snowflake")
 
-        # # ------------------------------------------------------------------ #
-        # # 3. Built In NYC — collect then immediately load
-        # # ------------------------------------------------------------------ #
-        # try:
-        #     results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
-        #     log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
-        # except Exception as e:
-        #     log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
-        #     failures.append("builtin")
+        # ------------------------------------------------------------------ #
+        # 3. Built In NYC — collect then immediately load
+        # ------------------------------------------------------------------ #
+        try:
+            results["builtin"] = builtin_scraper.fetch_all(configs=BUILTIN_CONFIGS)
+            log.info(f"Built In NYC — {len(results['builtin'])} rows collected.")
+        except Exception as e:
+            log.error(f"Built In NYC source FAILED: {e}", exc_info=True)
+            failures.append("builtin")
 
-        # try:
-        #     if results["builtin"]:
-        #         load_results = loader.load(results["builtin"])
-        #         for table, count in load_results.items():
-        #             log.info(f"  {table}: {count} rows inserted.")
-        #     else:
-        #         log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
-        # except Exception as e:
-        #     log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
-        #     failures.append("builtin_snowflake")
+        try:
+            if results["builtin"]:
+                load_results = loader.load(results["builtin"])
+                for table, count in load_results.items():
+                    log.info(f"  {table}: {count} rows inserted.")
+            else:
+                log.warning("Built In NYC — no rows to load, skipping Snowflake write.")
+        except Exception as e:
+            log.error(f"Built In NYC Snowflake load FAILED: {e}", exc_info=True)
+            failures.append("builtin_snowflake")
 
     # ------------------------------------------------------------------ #
     # 4. Run summary

@@ -39,11 +39,10 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://api.theirstack.com/v1/jobs/search"
 
 # 200 credits/month, runs every 3 days (~10 runs/month).
-# 10 credits/query × 3 queries × 10 runs = 300 credits theoretical max.
-# In practice each window won't saturate all three caps — total will
+# 10 credits/query × 4 queries × 10 runs = 400 credits theoretical max.
+# In practice each window won't saturate all four caps — total will
 # be well under 200. Monitor usage and adjust if needed.
-# PRODUCTION_LIMIT_PER_QUERY = 10
-PRODUCTION_LIMIT_PER_QUERY = 40
+PRODUCTION_LIMIT_PER_QUERY = 10
 
 FREE_SWEEP_PAGE_SIZE = 25  # max TheirStack returns per page
 MAX_RETRIES = 3
@@ -76,8 +75,7 @@ _BASE_FILTERS: dict[str, Any] = {
         "(?i)manhattan",
         "(?i)brooklyn",
     ],
-    # "posted_at_max_age_days": 7,
-    "posted_at_max_age_days": 30,
+    "posted_at_max_age_days": 7,
     "order_by": [{"field": "discovered_at", "desc": True}],
 }
 
@@ -224,77 +222,27 @@ class TheirStackClient:
 
         return self._to_snowflake_rows(paid_jobs, label=config["label"])
 
-    # def _free_sweep(
-    #     self,
-    #     search_body: dict[str, Any],
-    #     discovered_at_gte: str | None = None,
-    # ) -> list[dict]:
-    #     """
-    #     Paginate through ALL matching jobs with blur_company_data=True.
-    #     Costs zero credits regardless of how many pages are fetched.
-    #     """
-    #     all_jobs: list[dict] = []
-    #     page = 0
-
-    #     while True:
-    #         body: dict[str, Any] = {
-    #             **search_body,
-    #             "blur_company_data": True,
-    #             "include_total_results": page == 0,
-    #             "limit": FREE_SWEEP_PAGE_SIZE,
-    #             "page": page,
-    #         }
-
-    #         if discovered_at_gte:
-    #             body["discovered_at_gte"] = discovered_at_gte
-
-    #         log.info(f"    Free sweep page {page} — zero credits.")
-    #         data = self._post(body)
-
-    #         if page == 0:
-    #             total = data.get("metadata", {}).get("total_results", "?")
-    #             log.info(f"    TheirStack reports {total} total matching jobs.")
-
-    #         page_jobs = data.get("data", [])
-
-    #         if not page_jobs:
-    #             log.info("    Empty page — sweep complete.")
-    #             break
-
-    #         all_jobs.extend(page_jobs)
-    #         log.info(
-    #             f"    Page {page}: {len(page_jobs)} jobs collected "
-    #             f"(running total: {len(all_jobs)})."
-    #         )
-
-    #         if len(page_jobs) < FREE_SWEEP_PAGE_SIZE:
-    #             log.info("    Partial page — reached last page.")
-    #             break
-
-    #         page += 1
-
-    #     return all_jobs
-    
     def _free_sweep(
         self,
         search_body: dict[str, Any],
         discovered_at_gte: str | None = None,
-        max_free_sweep_pages: int = 4,
+        max_free_sweep_pages: int = 5,
     ) -> list[dict]:
         """
         Paginate through ALL matching jobs with blur_company_data=True.
         Costs zero credits regardless of how many pages are fetched.
 
-        Capped at max_free_sweep_pages — TheirStack appears to return HTTP 403
-        on deep free-sweep pagination (observed failing consistently at page 5,
-        ~125+ cumulative jobs, undocumented in their API rate-limit docs).
-        Stopping one page early avoids losing all jobs collected so far to an
-        unhandled exception.
+        Capped at max_free_sweep_pages — confirmed via API error E-020:
+        "Your current plan allows to view up to 5 pages of results."
+        Pages 0-4 are allowed; page 5 (the 6th request) returns HTTP 403.
+        Stopping at the real limit avoids losing all jobs collected so far
+        to an unhandled exception. Should never bind during normal
+        3-day-cadence runs, which don't approach this volume.
         """
         all_jobs: list[dict] = []
         page = 0
 
-        while page < max_free_sweep_pages: 
+        while page < max_free_sweep_pages:
             body: dict[str, Any] = {
                 **search_body,
                 "blur_company_data": True,
@@ -331,6 +279,13 @@ class TheirStackClient:
 
             page += 1
 
+        if page >= max_free_sweep_pages:
+            log.warning(
+                f"    Hit max_free_sweep_pages ({max_free_sweep_pages}) — "
+                f"stopping early at the plan's page limit. "
+                f"{len(all_jobs)} jobs collected; some matching jobs may be left uncollected."
+            )
+
         return all_jobs
 
     def _deduplicate(self, jobs: list[dict]) -> list[dict]:
@@ -356,33 +311,51 @@ class TheirStackClient:
 
         return unique
 
+    # TheirStack's plan-level cap confirmed via API error E-020:
+    # "Your current plan allows up to 25 results per page."
+    PAID_FETCH_BATCH_SIZE = 25
+
     def _paid_fetch(self, job_ids: list[int], label: str = "") -> list[dict]:
         """
         Fetch full unblurred job records for the given IDs.
         Costs 1 credit per job returned.
+
+        Batches requests at PAID_FETCH_BATCH_SIZE — the account's plan
+        hard-caps "limit" at 25 per request (confirmed via API error E-020).
+        Requesting more than 25 IDs in a single call fails with HTTP 403,
+        even though that response is otherwise indistinguishable from a
+        rate-limit or gateway-level block without inspecting the response
+        body directly.
         """
-        body: dict[str, Any] = {
-            "job_id_or": job_ids,
-            "blur_company_data": False,
-            "include_total_results": False,
-            "limit": len(job_ids),
-        }
+        all_jobs: list[dict] = []
 
-        log.info(
-            f"    [{label}] Paid fetch — requesting {len(job_ids)} jobs "
-            f"({len(job_ids)} credits)."
-        )
+        for i in range(0, len(job_ids), self.PAID_FETCH_BATCH_SIZE):
+            batch = job_ids[i : i + self.PAID_FETCH_BATCH_SIZE]
 
-        data = self._post(body)
-        jobs = data.get("data", [])
+            body: dict[str, Any] = {
+                "job_id_or": batch,
+                "blur_company_data": False,
+                "include_total_results": False,
+                "limit": len(batch),
+            }
 
-        if len(jobs) != len(job_ids):
-            log.warning(
-                f"    [{label}] Expected {len(job_ids)} jobs, got {len(jobs)}. "
-                f"Some listings may have expired or been removed."
+            log.info(
+                f"    [{label}] Paid fetch — requesting {len(batch)} jobs "
+                f"({len(batch)} credits)."
             )
 
-        return jobs
+            data = self._post(body)
+            jobs = data.get("data", [])
+
+            if len(jobs) != len(batch):
+                log.warning(
+                    f"    [{label}] Expected {len(batch)} jobs, got {len(jobs)}. "
+                    f"Some listings may have expired or been removed."
+                )
+
+            all_jobs.extend(jobs)
+
+        return all_jobs
 
     def _post(self, body: dict[str, Any]) -> dict[str, Any]:
         """

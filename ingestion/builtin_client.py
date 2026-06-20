@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 BASE_SEARCH_URL = (
     "https://www.builtinnyc.com/jobs/entry-level/junior/mid-level"
     "?search={search_term}"
-    "&daysSinceUpdated=30"
+    "&daysSinceUpdated=3"
     "&city=New+York+City"
     "&state=New+York"
     "&country=USA"
