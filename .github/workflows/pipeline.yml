@@ -35,18 +35,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run ingestion pipeline
-        env:
-          RAPIDAPI_KEY:        ${{ secrets.RAPIDAPI_KEY }}
-          THEIRSTACK_KEY:      ${{ secrets.THEIRSTACK_KEY }}
-          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
-          PYTHONPATH:          ${{ github.workspace }}
-        run: python ingestion/run_ingestion.py
+      # - name: Run ingestion pipeline
+      #   env:
+      #     RAPIDAPI_KEY:        ${{ secrets.RAPIDAPI_KEY }}
+      #     THEIRSTACK_KEY:      ${{ secrets.THEIRSTACK_KEY }}
+      #     SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      #     SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+      #     SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      #     SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE }}
+      #     SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      #     SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+      #     PYTHONPATH:          ${{ github.workspace }}
+      #   run: python ingestion/run_ingestion.py
 
       - name: Run enrichment
         env:
