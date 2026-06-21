@@ -67,11 +67,6 @@ st.markdown(
 )
 
 # ── Page definitions ──────────────────────────────────────────────────────────
-# market_insights = st.Page(
-#     "pages/01_market_insights.py",
-#     title="Market Insights",
-#     icon="📈",
-# )
 home = st.Page(
     "pages/00_home.py",
     title="Home",
@@ -88,19 +83,18 @@ under_the_hood = st.Page(
     icon="🔬",
 )
 job_explorer = st.Page(
-    "pages/02_job_explorer.py",
+    "pages/03_job_explorer.py",
     title="Job Explorer",
     icon="🔍",
 )
 pipeline_health = st.Page(
-    "pages/03_pipeline_health.py",
+    "pages/04_pipeline_health.py",
     title="Pipeline Health",
     icon="🛠",
 )
 
 pg = st.navigation(
     {
-        # "Dashboard": [market_insights, job_explorer, pipeline_health, home, landscape, under_the_hood],
         "Dashboard": [home, landscape, under_the_hood, job_explorer, pipeline_health],
     }
 )
