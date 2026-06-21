@@ -101,7 +101,7 @@ INSERT INTO enriched.public.job_enrichment (
 SELECT
     $1, $2, $3, $4, $5,
     PARSE_JSON($6), PARSE_JSON($7), PARSE_JSON($8), PARSE_JSON($9),
-    $10, $11, $12, $13, $14, $15, $16, $17, $18::TIMESTAMP_TZ, $19
+    $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::TIMESTAMP_TZ, $20
 FROM VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
