@@ -97,15 +97,6 @@ def load_fct_job_postings() -> pd.DataFrame:
                 lambda x: True if str(x).strip().upper() in ("TRUE", "1", "YES") else False
             )
 
-    # Derive effective_seniority — combines listed_seniority (TheirStack + Built In)
-    # with is_explicitly_entry_level (JSearch proxy) for a unified seniority field
-    SENIORITY_ORDER = ["entry_level", "junior", "mid_level"]
-    if "listed_seniority" in df.columns and "is_explicitly_entry_level" in df.columns:
-        df["effective_seniority"] = df["listed_seniority"].where(
-            df["listed_seniority"].isin(SENIORITY_ORDER),
-            other=df["is_explicitly_entry_level"].map({True: "entry_level", False: None})
-        )
-
     return df
 
 @st.cache_data(ttl=300)

@@ -79,14 +79,6 @@ models:
           TheirStack (native field) and Built In (scraped from page). NULL for
           JSearch, which has no structured seniority field.
 
-      - name: is_explicitly_entry_level
-        description: >
-          Boolean flag indicating the job title explicitly signals an entry-level
-          role via keywords: entry, junior, jr, new grad, early career. Derived
-          from job title across all three sources.
-        tests:
-          - not_null
-
       - name: final_salary_min
         description: >
           Minimum annual salary in USD. Prefers structured payload value; falls
@@ -107,17 +99,6 @@ models:
 
       - name: work_focus
         description: Primary work focus area inferred by LLM.
-
-      - name: title_seniority_signal
-        description: >
-          LLM assessment of whether the job title accurately reflects the actual
-          seniority of the role. Values: accurate, overstated (title implies more
-          senior than requirements support), understated (requirements exceed what
-          the title implies).
-
-      - name: title_signal_reasoning
-        description: >
-          LLM explanation for title_seniority_signal. Null when signal is accurate.
 
       - name: acknowledges_ai
         description: >

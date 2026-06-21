@@ -51,11 +51,6 @@ extracted as (
 
         null::STRING                                                as listed_seniority,
 
-        REGEXP_LIKE(
-            LOWER(RAW_PAYLOAD:job_title::STRING),
-            '.*(entry|junior|jr\\.?|new.?grad|early.?career).*'
-        )                                                           as is_explicitly_entry_level,
-
         INGESTED_AT as ingested_at
 
     from source

@@ -42,8 +42,6 @@ enrichment as (
         inferred_seniority,
         role_archetype,
         work_focus,
-        title_seniority_signal,
-        title_signal_reasoning,
         tech_stack_required,
         tech_stack_preferred,
         paradigms_required,
@@ -86,7 +84,6 @@ joined as (
         j.work_model,
         j.employment_type,
         j.listed_seniority,
-        j.is_explicitly_entry_level,
 
         -- salary: prefer structured payload value, fall back to LLM estimate
         COALESCE(j.salary_min, e.llm_salary_min)   as final_salary_min,
@@ -95,8 +92,6 @@ joined as (
         e.inferred_seniority,
         e.role_archetype,
         e.work_focus,
-        e.title_seniority_signal,
-        e.title_signal_reasoning,
         e.acknowledges_ai,
         e.domain,
         e.explicitly_encourages_applicants,

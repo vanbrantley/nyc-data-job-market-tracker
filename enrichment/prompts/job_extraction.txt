@@ -5,9 +5,7 @@ Return ONLY a valid JSON object — no preamble, no markdown, no explanation.
 The JSON must conform to this exact schema:
 
 {
-  "inferred_seniority": <"entry" | "mid" | "senior">,
-  "title_seniority_signal": <"accurate" | "overstated" | "understated">,
-  "title_signal_reasoning": <string — 1-2 sentences or null if accurate>,
+  "inferred_seniority": <"entry" | "junior" | "mid" | "senior">,
   "role_archetype": <"data_analyst" | "analytics_engineer" | "data_engineer" | "data_scientist" | "hybrid" | "software_engineer">,
   "work_focus": <string — short phrase describing primary day-to-day work, max 8 words>,
   "tech_stack_required": <array of lowercase strings — tools explicitly required>,
@@ -28,16 +26,14 @@ The JSON must conform to this exact schema:
 Rules:
 
 inferred_seniority: base this on actual requirements, NOT the title.
-  entry = 0-2 years or no experience required
-  mid = 2-5 years
-  senior = 5+ years
+  entry = 0 years of experience required (no prior professional experience expected)
+  junior = 1-2 years of experience required
+  mid = 3-5 years of experience required
+  senior = 5+ years of experience required
 
-title_seniority_signal: compare the seniority implied by the job title against inferred_seniority.
-  accurate = title aligns with inferred seniority
-  overstated = title implies higher seniority than inferred_seniority supports
-  understated = title implies lower seniority than inferred_seniority supports
-
-title_signal_reasoning: 1-2 sentences explaining the mismatch. null if title_seniority_signal is "accurate".
+  When a posting gives a range (e.g. "0-2 years"), use the MINIMUM stated
+  requirement to classify: "0-2 years" -> entry (the floor is 0). "1-3 years" -> junior
+  (the floor is 1). Do not average or round — always anchor to the minimum.
 
 role_archetype: the primary operational reality of the role.
   data_analyst = focused on querying, reporting, and business insights

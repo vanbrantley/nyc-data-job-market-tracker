@@ -36,7 +36,7 @@ FILTER_KEYS = [
     "filter_techs", "filter_archetypes", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
     "filter_salary", "filter_dates", "filter_title", "filter_salary_only",
-    "filter_listed_seniority", "filter_title_signal", "filter_domain",
+    "filter_listed_seniority", "filter_domain",
     "filter_acknowledges_ai", "filter_encourages_applicants",
 ]
 
@@ -61,7 +61,6 @@ with st.sidebar:
         st.session_state["filter_title"] = ""
         st.session_state["filter_salary_only"] = False
         st.session_state["filter_listed_seniority"] = []
-        st.session_state["filter_title_signal"] = []
         st.session_state["filter_domain"] = []
         st.session_state["filter_acknowledges_ai"] = False
         st.session_state["filter_encourages_applicants"] = False
@@ -158,17 +157,6 @@ with st.sidebar:
         key="filter_domain"
     )
 
-    # Title seniority signal
-    signal_opts = ["accurate", "overstated", "understated"]
-    sel_title_signal = st.multiselect(
-        "Title Seniority Signal",
-        options=signal_opts,
-        format_func=format_snake_case,
-        default=[],
-        placeholder="All",
-        key="filter_title_signal"
-    )
-
     # Acknowledges AI
     sel_acknowledges_ai = st.checkbox(
         "Acknowledges AI",
@@ -238,8 +226,6 @@ if sel_degrees:
     df = df[df["degree_requirement"].isin(sel_degrees)]
 if sel_listed_seniority:
     df = df[df["listed_seniority"].isin(sel_listed_seniority)]
-if sel_title_signal:
-    df = df[df["title_seniority_signal"].isin(sel_title_signal)]
 if sel_domain:
     df = df[df["domain"].isin(sel_domain)]
 if sel_acknowledges_ai:
@@ -373,16 +359,8 @@ def tag_pills(items: list, css_class: str = "tag-blue") -> str:
 col_left, col_right = st.columns([1.1, 1])
 
 with col_left:
-    # Title signal badge
-    signal = job.get("title_seniority_signal")
-    signal_badge = ""
-    if signal == "overstated":
-        signal_badge = ' <span class="tag-pill tag-red">⬆ Title Overstated</span>'
-    elif signal == "understated":
-        signal_badge = ' <span class="tag-pill tag-green">⬇ Title Understated</span>'
-
     st.markdown(
-        f"<h3 style='margin-bottom:2px'>{job['job_title']}{signal_badge}</h3>",
+        f"<h3 style='margin-bottom:2px'>{job['job_title']}</h3>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -467,13 +445,6 @@ with col_left:
         st.markdown(f"**Degree Req:** {degree}")
         st.markdown(f"**YoE Required:** {yoe_str}")
         st.markdown(f"**Confidence:** {conf_str}")
-
-    # Title signal reasoning
-    if signal in ("overstated", "understated") and job.get("title_signal_reasoning"):
-        st.markdown("")
-        icon = "🚩" if signal == "overstated" else "💡"
-        label = "Overstated" if signal == "overstated" else "Understated"
-        st.warning(f"**Title Signal ({label}):** {job['title_signal_reasoning']}", icon=icon)
 
     st.markdown("")
 

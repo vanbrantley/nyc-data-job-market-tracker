@@ -3,9 +3,7 @@ from pydantic import BaseModel, field_validator, model_validator
 
 
 class JobEnrichmentSchema(BaseModel):
-    inferred_seniority: Literal["entry", "mid", "senior"]
-    title_seniority_signal: Literal["accurate", "overstated", "understated"]
-    title_signal_reasoning: Optional[str] = None
+    inferred_seniority: Literal["entry", "junior", "mid", "senior"]
     role_archetype: Literal[
         "data_analyst",
         "analytics_engineer",
