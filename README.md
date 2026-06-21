@@ -32,8 +32,8 @@ SNOWFLAKE RAW               (strict ELT — VARIANT columns, no transformation a
 ENRICHMENT                  (GPT-4o-mini, runs sequentially post-ingest)
     Pulls unenriched rows from all three raw tables
     Extracts: role_archetype · work_focus · tech_stack (required/preferred)
-              paradigms · degree_requirement · salary · seniority
-              title_seniority_signal · acknowledges_ai · explicitly_encourages_applicants
+          paradigms · degree_requirement · salary · inferred_seniority (4-tier)
+          acknowledges_ai · explicitly_encourages_applicants
     Validates with Pydantic before writing
     → ENRICHED.PUBLIC.JOB_ENRICHMENT
                                           ↓
@@ -83,8 +83,8 @@ The enrichment pipeline sends each job title + description to GPT-4o-mini with a
 ### Listed title vs. LLM-assigned archetype
 Every posting carries two independent labels: `ingestion_query` (the title the job was searched/listed under) and `role_archetype` (what the LLM determined the role actually is, based on the full description). Comparing the two — rather than collapsing them into one — is what surfaces title inflation and role convergence. This comparison is the core analytical mechanism behind the Under the Hood dashboard page.
 
-### Effective seniority — unifying inconsistent source labels
-Only TheirStack and Built In provide a structured `listed_seniority` field; JSearch does not. To avoid silently dropping a third of postings from seniority-based analysis, an `effective_seniority` field falls back to a title-regex-derived `is_explicitly_entry_level` flag when `listed_seniority` is null. Currently computed at runtime in the dashboard's data loader — slated to move into the dbt mart.
+### Early-career tier — a deliberately narrower seniority field
+Only TheirStack and Built In provide a structured `listed_seniority` field; JSearch does not. Rather than backfill JSearch with a weaker proxy, `early_career_tier` is scoped to just the two sources that self-report seniority, collapsing `entry_level` + `junior` into one tier (since TheirStack's own API can't distinguish them) alongside `mid`. A `years_required_min` cutoff was tested as a JSearch substitute and rejected — junior and mid-level postings overlap too heavily in stated experience requirements to support a clean threshold. Computed directly in the dbt mart (`int_jobs_unioned.sql`), not at dashboard runtime.
 
 ### Salary: structured payload takes precedence over LLM estimate
 Not all sources include structured salary fields. The mart model uses `COALESCE(structured_salary, llm_extracted_salary)` — structured payload values (from JSearch and Built In JSON-LD) are trusted first; LLM-extracted salary from description text fills gaps. This is surfaced as `final_salary_min` / `final_salary_max` in the fact table. Validation against structured-only coverage showed the LLM layer contributes roughly 30 percentage points of additional salary coverage.

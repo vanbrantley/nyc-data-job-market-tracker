@@ -83,10 +83,10 @@ nyc-data-job-market-tracker/
 ### 1. JSearch (RapidAPI)
 - **Type:** REST API
 - **What it provides:** Broad job board aggregation (Indeed, LinkedIn, etc.)
-- **Queries:** "Data Analyst in New York", "Analytics Engineer in New York", "Data Engineer in New York"
+- **Queries:** "Data Analyst in New York", "Analytics Engineer in New York", "Data Engineer in New York", "Data Scientist in New York"
 - **Parameters:** `date_posted=3days`, `job_requirements=under_3_years_experience,no_experience`
-- **Pagination:** Cursor-based, max 6 pages per query
-- **Credit budget:** 200 credits/month, ~10 runs/month → 6 pages × 3 queries = 180 credits max
+- **Pagination:** Cursor-based, max 5 pages per query
+- **Credit budget:** 200 credits/month, ~10 runs/month → 5 pages × 4 queries = 200 credits theoretical max. Real usage runs well under this since not every query hits the full page cap every run.
 - **Limitations:** No structured seniority field. Uses `is_explicitly_entry_level` boolean flag as proxy (regex on job title).
 - **Known issue:** Same job can appear across multiple queries. Deduped in `fetch_all()` by `job_id` before writing to Snowflake.
 
@@ -96,7 +96,8 @@ nyc-data-job-market-tracker/
 - **Credit budget:** 200 credits/month on free tier. Credits charged per job returned, not per request — limit is the main budget lever.
 - **Free sweep strategy:** Run `blur_company_data=True` first across all pages at zero credit cost to collect all matching job IDs. Deduplicate in memory using `(title, location, frozenset(technology_slugs))`. Then fetch full records only for new jobs.
 - **High-water mark:** Uses `discovered_at_gte` from Snowflake on each run — queries for jobs discovered after the latest `INGESTED_AT` in `RAW.THEIRSTACK.SRC_POSTINGS` to avoid re-fetching already-ingested jobs.
-- **Credit math:** 10 credits/query × 3 queries × 10 runs = 300 theoretical max, but each window won't saturate all three caps. In practice well under 200/month. Monitor via Pipeline Health page.
+- **Credit math:** 10 credits/query × 4 queries × 10 runs = 400 theoretical max, but each window won't saturate all four caps. In practice well under 200/month. Monitor via Pipeline Health page.
+- **Confirmed plan limits (API error E-020):** free-sweep pagination is capped at 5 pages total (page 5 — the 6th request — returns HTTP 403 with `"Your current plan allows to view up to 5 pages of results"`). Paid-fetch `limit` is capped at 25 results per request (`"Your current plan allows up to 25 results per page"`). The client enforces both: `_free_sweep` stops at `max_free_sweep_pages=5`, `_paid_fetch` batches requests at `PAID_FETCH_BATCH_SIZE=25`.
 - **Notable:** Has native `seniority` field in payload (e.g. `mid_level`, `junior`). 100% fill rate.
 - **Normalization:** `seniority` values lowercased and spaces replaced with underscores in staging (`REPLACE(LOWER(RAW_PAYLOAD:seniority::STRING), ' ', '_')`).
 
@@ -212,21 +213,20 @@ Final select from `int_jobs_unioned`. No additional logic.
 | `final_salary_min` | FLOAT | Prefers structured value, falls back to LLM |
 | `final_salary_max` | FLOAT | Prefers structured value, falls back to LLM |
 
-### Seniority Fields (added v2)
+### Seniority Fields (redesigned v3, June 2026)
 | Field | Type | Description |
 |---|---|---|
-| `listed_seniority` | STRING | Seniority as labeled by source. Populated for TheirStack and Built In. NULL for JSearch. Values: `entry_level`, `junior`, `mid_level`. |
-| `is_explicitly_entry_level` | BOOLEAN | Title regex flag across all sources: `entry\|junior\|jr\.?\|new.?grad\|early.?career` |
-| `effective_seniority` | STRING | **Derived in `data_loader.py` at runtime** — combines `listed_seniority` with `is_explicitly_entry_level` to produce a unified seniority field across all sources. Values: `entry_level`, `junior`, `mid_level`. **Backlog: move into dbt mart.** |
+| `listed_seniority` | STRING | Seniority as labeled by source. Populated for TheirStack and Built In. NULL for JSearch. Values: `entry_level`, `junior`, `mid_level`. Flawed by design — TheirStack's own API has no `entry_level` tier, so its `junior` value is structurally ambiguous between true entry-level and junior. Left as-is; the imperfection is itself part of what's being investigated. |
+| `early_career_tier` | STRING | **Computed in `int_jobs_unioned.sql`** — collapses `listed_seniority`'s `entry_level` + `junior` into `entry_or_junior`, alongside `mid` (from `mid_level`). Scoped to `builtin`/`theirstack` only — `jsearch` is NULL, since it has no structured seniority field. A `years_required_min` cutoff was tested as a substitute for JSearch and rejected: `junior` (0–3 yrs) and `mid_level` (0–10 yrs) overlap too heavily to support a clean cutoff — itself a finding, not just a null result. Replaces the old runtime-computed `effective_seniority` (removed). |
+
+`is_explicitly_entry_level` was removed — it was a title-regex proxy for "no experience required," made redundant once `years_required_min` (already extracted by the LLM) answers the same question more directly.
 
 ### LLM Enrichment Fields
 | Field | Type | Description |
 |---|---|---|
-| `inferred_seniority` | STRING | GPT-4o-mini inferred seniority from description |
+| `inferred_seniority` | STRING | GPT-4o-mini inferred seniority from description. 4-tier scale as of June 2026: `entry` (0 yrs), `junior` (1–2 yrs), `mid` (3–5 yrs), `senior` (5+ yrs) — anchored to the minimum of any stated range. Previously 3-tier (entry/mid/senior only). |
 | `role_archetype` | STRING | `data_analyst`, `data_engineer`, `analytics_engineer`, etc. |
 | `work_focus` | STRING | Primary focus area |
-| `is_title_inflated` | BOOLEAN | LLM flag for inflated title relative to actual role |
-| `inflation_reasoning` | STRING | LLM explanation. ~85% null. |
 | `tech_stack_required` | VARIANT | Array of required technologies |
 | `tech_stack_preferred` | VARIANT | Array of preferred technologies |
 | `paradigms_required` | VARIANT | Array of required paradigms |
@@ -234,8 +234,7 @@ Final select from `int_jobs_unioned`. No additional logic.
 | `degree_requirement` | STRING | `none`, `bachelors`, `masters`, `equivalent_ok` |
 | `years_required_min` | FLOAT | Min years experience |
 | `years_required_max` | FLOAT | Max years experience |
-| `explicitly_encourages_applicants` | BOOLEAN | LLM flag — posting explicitly encourages applicants who don't meet all requirements. Currently fires too liberally — prompt needs tightening. |
-| `title_seniority_signal` | STRING | LLM assessment of whether title accurately reflects role seniority: `accurate`, `overstated`, `understated` |
+| `explicitly_encourages_applicants` | BOOLEAN | LLM flag — posting explicitly invites candidates who don't meet all requirements to apply anyway. Prompt tightened June 2026 with explicit EEO-boilerplate exclusions; true rate dropped from ~25% to ~8%. See Known Issues for residual false-positive rate. |
 | `acknowledges_ai` | BOOLEAN | Whether posting explicitly mentions AI, LLMs, or related tools |
 | `confidence_score` | FLOAT | LLM self-reported confidence (0–1) |
 | `enriched_at` | TIMESTAMP | When enrichment was written |
@@ -290,7 +289,7 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 - Dynamic `df_key` incrementing to force dataframe widget re-render on filter change
 - `date_posted` kept as datetime in display dataframe, formatted via `st.column_config.DateColumn` — ensures correct click-to-sort behavior
 - All data loaded via `load_fct_job_postings()` with 1-hour cache
-- `effective_seniority` derived in `data_loader.py` post-load — not a mart column
+- `early_career_tier` computed in the dbt mart (`int_jobs_unioned.sql`) — no longer derived at runtime in `data_loader.py`
 
 ---
 
@@ -356,15 +355,9 @@ keeping `salary_min`/`salary_max` in the enrichment prompt.
 - Built In seniority not in JSON-LD — extracted from HTML, fragile if page structure changes
 - JSearch `job_requirements` filter (`under_3_years_experience`) doesn't reliably exclude senior roles — senior title regex in staging is the real filter
 - API credit tracking (`credits_used_this_run`) may be slightly overstated when manual JSearch API calls are made between pipeline runs — diff-based calculation picks up all usage not just pipeline usage
-- **Job Explorer filter reset bug** — clearing filters via sidebar resets the job detail panel to the first job in the list, but the previously selected row remains visually highlighted in the dataframe. The `pending_clear` + `df_key` pattern handles widget state but doesn't fully sync the selection state on clear.
+- ~~Job Explorer filter reset bug~~ — **Resolved June 2026.** Root cause: the dataframe selection widget's re-render key was tied to filtered row *count*, not row *contents* — two different filtered sets with the same row count would incorrectly reuse the same widget state. Fixed by keying off a hash of the actual filtered `job_id`s instead.
 - **`explicitly_encourages_applicants` has a residual false-positive rate** — the enrichment prompt explicitly excludes EEO/equal-opportunity boilerplate ("all qualified individuals are encouraged to apply") and generic enthusiasm language ("if you're passionate about this role, apply") with verbatim true/false examples, but GPT-4o-mini does not reliably apply these exclusions 100% of the time — confirmed by getting the model to state reasoning that directly contradicted its own explicit instructions on an example matching a listed false case almost word for word. In a manual spot-check of all postings flagged true after the prompt fix, 2 of 24 were still judged incorrect. Also observed run-to-run inconsistency on at least one borderline posting at `temperature=0`, indicating some inherent non-determinism beyond the exclusion-following issue. Not worth further prompt iteration — field is not used in any current dashboard page or write-up finding. If this field becomes load-bearing for analysis later, revisit with either a stronger model (GPT-4o) for this field specifically, or a two-step extract-then-classify approach (extract the literal evidence sentence first, then classify it in a separate pass).
 
 ### Backlog
-- **`effective_seniority` into dbt mart** — currently derived at runtime in `data_loader.py`. Should be moved into `fct_job_postings.sql` so it's queryable directly in Snowflake and testable via dbt. Once done, remove derivation from `data_loader.py` and all dashboard pages.
-- **`run_type` field in `RAW.PIPELINE.RUNS`** — add `scheduled` vs `manual` to distinguish cron-triggered runs from manual re-runs. Pass via GitHub Actions env var (`github.event_name == 'schedule'`). Used to filter manual runs from the frequency over time chart and pipeline health page.
-- **Tighten `explicitly_encourages_applicants` enrichment prompt** — currently fires too liberally. Needs stricter language in `job_extraction.txt` before next re-enrichment run.
-- **Fix `degree_requirement: equivalent_ok` display label** — Job Explorer detail panel shows "Equivalent Ok" — should read "Experience Accepted" to match the intended meaning.
-- **Add Data Scientist ingestion query** — add "Data Scientist in New York" query across all three sources (JSearch, TheirStack, Built In). Dashboard charts group dynamically by `ingestion_query` so DS data will appear automatically once ingested.
-- **Backfill historical data** — use remaining API credits after Thursday's pipeline run to backfill older postings for DS and other queries. Built In: remove `daysSinceUpdated` filter to get full history (~132 results). TheirStack: bypass `discovered_at_gte` high-water mark. JSearch: change `date_posted` parameter. Verify dedup by `job_id` handles any overlap with already-ingested jobs.
 
 ---
