@@ -30,9 +30,9 @@ MUTED  = "#475569"
 TEAL   = "#14b8a6"
 PURPLE = "#a855f7"
 
-SENIORITY_ORDER  = ["entry_level", "junior", "mid_level"]
-SENIORITY_LABELS = {"entry_level": "Entry Level", "junior": "Junior", "mid_level": "Mid Level"}
-SENIORITY_COLORS = [GREEN, TEAL, BLUE]
+SENIORITY_ORDER  = ["entry_or_junior", "mid"]
+SENIORITY_LABELS = {"entry_or_junior": "Entry–Junior", "mid": "Mid"}
+SENIORITY_COLORS = [GREEN, BLUE]
 
 ARCHETYPE_LABELS = {
     "data_analyst":       "Data Analyst",
@@ -58,7 +58,6 @@ query_colors = {q: QUERY_COLOR_LIST[i % len(QUERY_COLOR_LIST)] for i, q in enume
 
 salary_df = df.dropna(subset=["final_salary_min", "final_salary_max"]).copy()
 salary_df["salary_mid"] = (salary_df["final_salary_min"] + salary_df["final_salary_max"]) / 2
-listed_df = df[df["effective_seniority"].isin(SENIORITY_ORDER)].copy()
 
 # ── Page header ────────────────────────────────────────────────────────────────
 st.title("🔬 Under the Hood")
@@ -339,13 +338,16 @@ with col_ai:
 
 with col_exp:
     st.markdown("#### Experience Requirements")
-    st.caption("Median years of experience required by role type and seniority (where specified by the LLM)")
+    st.caption(
+        "Built In NYC and TheirStack only, since they're the only sources that list "
+        "seniority — shown where years of experience and seniority were both specified."
+    )
 
     yrs_df = df.dropna(subset=["years_required_min"]).copy()
-    yrs_df = yrs_df[yrs_df["effective_seniority"].isin(SENIORITY_ORDER)]
+    yrs_df = yrs_df[yrs_df["early_career_tier"].isin(SENIORITY_ORDER)]
 
     yrs_by_query_sen = (
-        yrs_df.groupby(["ingestion_query", "effective_seniority"])["years_required_min"]
+        yrs_df.groupby(["ingestion_query", "early_career_tier"])["years_required_min"]
         .agg(["median", "count"])
         .reset_index()
     )

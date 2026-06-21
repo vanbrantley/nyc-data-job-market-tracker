@@ -152,7 +152,6 @@ with col_stats:
     st.markdown("<br>", unsafe_allow_html=True)
     st.caption(
         "Pipeline runs Monday and Thursday. Stats update as new postings are ingested. "
-        "Data scientist postings coming soon."
     )
 
 st.divider()

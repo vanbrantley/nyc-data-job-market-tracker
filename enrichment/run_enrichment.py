@@ -91,7 +91,7 @@ ORDER BY source, job_id
 
 INSERT_QUERY = """
 INSERT INTO enriched.public.job_enrichment (
-    job_id, source, inferred_seniority, title_seniority_signal, title_signal_reasoning,
+    job_id, source, inferred_seniority,
     role_archetype, work_focus, tech_stack_required, tech_stack_preferred,
     paradigms_required, paradigms_preferred, degree_requirement,
     years_required_min, years_required_max, salary_min, salary_max,
@@ -99,10 +99,10 @@ INSERT INTO enriched.public.job_enrichment (
     confidence_score, enriched_at, model_version
 )
 SELECT
-    $1, $2, $3, $4, $5, $6, $7,
-    PARSE_JSON($8), PARSE_JSON($9), PARSE_JSON($10), PARSE_JSON($11),
-    $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::TIMESTAMP_TZ, $22
-FROM VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    $1, $2, $3, $4, $5,
+    PARSE_JSON($6), PARSE_JSON($7), PARSE_JSON($8), PARSE_JSON($9),
+    $10, $11, $12, $13, $14, $15, $16, $17, $18::TIMESTAMP_TZ, $19
+FROM VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 
@@ -196,8 +196,6 @@ def write_row(
             job["job_id"],
             job["source"],
             validated.inferred_seniority,
-            validated.title_seniority_signal,
-            validated.title_signal_reasoning,
             validated.role_archetype,
             validated.work_focus,
             json.dumps(validated.tech_stack_required),

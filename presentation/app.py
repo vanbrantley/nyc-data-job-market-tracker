@@ -67,11 +67,11 @@ st.markdown(
 )
 
 # ── Page definitions ──────────────────────────────────────────────────────────
-market_insights = st.Page(
-    "pages/01_market_insights.py",
-    title="Market Insights",
-    icon="📈",
-)
+# market_insights = st.Page(
+#     "pages/01_market_insights.py",
+#     title="Market Insights",
+#     icon="📈",
+# )
 home = st.Page(
     "pages/00_home.py",
     title="Home",

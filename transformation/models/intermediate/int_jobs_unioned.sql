@@ -85,6 +85,22 @@ joined as (
         j.employment_type,
         j.listed_seniority,
 
+        -- early_career_tier: collapsed entry+junior grouping for dashboard charts.
+        -- Built from listed_seniority ONLY (no LLM input) — scoped to builtin and
+        -- theirstack, which both self-report seniority as a structured field.
+        -- jsearch is intentionally excluded: it has no structured seniority field,
+        -- and testing showed years_required_min overlaps too heavily between
+        -- junior (0-3 yrs) and mid_level (0-10 yrs) postings to safely substitute.
+        case
+            when j.source in ('builtin', 'theirstack')
+                 and j.listed_seniority in ('entry_level', 'junior')
+                then 'entry_or_junior'
+            when j.source in ('builtin', 'theirstack')
+                 and j.listed_seniority = 'mid_level'
+                then 'mid'
+            else null
+        end                                          as early_career_tier,
+
         -- salary: prefer structured payload value, fall back to LLM estimate
         COALESCE(j.salary_min, e.llm_salary_min)   as final_salary_min,
         COALESCE(j.salary_max, e.llm_salary_max)   as final_salary_max,

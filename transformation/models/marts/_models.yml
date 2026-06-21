@@ -89,6 +89,15 @@ models:
           Maximum annual salary in USD. Prefers structured payload value; falls
           back to LLM estimate. ~63% coverage. No sanity bounds applied.
 
+      - name: early_career_tier
+        description: >
+          Collapsed seniority grouping for dashboard charts: 'entry_or_junior'
+          (combines entry_level + junior, since builtin/theirstack don't reliably
+          distinguish these) or 'mid'. Derived from listed_seniority only —
+          scoped to builtin and theirstack, which self-report structured
+          seniority. NULL for jsearch (no structured seniority field) and for
+          any row with listed_seniority outside this scale.
+
       - name: inferred_seniority
         description: Seniority level inferred by GPT-4o-mini from the job description.
 

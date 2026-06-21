@@ -29,9 +29,9 @@ MUTED = "#475569"
 TEAL  = "#14b8a6"
 PURPLE = "#a855f7"
 
-SENIORITY_ORDER  = ["entry_level", "junior", "mid_level"]
-SENIORITY_LABELS = {"entry_level": "Entry Level", "junior": "Junior", "mid_level": "Mid Level"}
-SENIORITY_COLORS = [GREEN, TEAL, BLUE]
+SENIORITY_ORDER  = ["entry_or_junior", "mid"]
+SENIORITY_LABELS = {"entry_or_junior": "Entry–Junior", "mid": "Mid"}
+SENIORITY_COLORS = [GREEN, BLUE]
 
 SOURCE_LABELS = {"builtin": "Built In NYC", "theirstack": "TheirStack", "jsearch": "JSearch"}
 SOURCE_COLORS = {"builtin": BLUE, "theirstack": TEAL, "jsearch": AMBER}
@@ -208,14 +208,14 @@ st.divider()
 # ── Row 3: Seniority Distribution by Role ─────────────────────────────────────
 st.markdown("#### Seniority Distribution by Role Type")
 
-listed_df = df[df["effective_seniority"].isin(SENIORITY_ORDER)].copy()
+listed_df = df[df["early_career_tier"].isin(SENIORITY_ORDER)].copy()
 st.caption(
-    f"Based on source-labeled seniority and JSearch entry-level title signal "
-    f"(n={len(listed_df)})."
+    f"Based on source-labeled seniority from Built In NYC and TheirStack only "
+    f"(JSearch has no structured seniority field). n={len(listed_df)}."
 )
 
 sen_by_query = (
-        listed_df.groupby(["ingestion_query", "effective_seniority"])
+        listed_df.groupby(["ingestion_query", "early_career_tier"])
         .size()
         .reset_index(name="count")
     )
@@ -226,7 +226,7 @@ with col5:
 
     fig5 = go.Figure()
     for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
-        subset = sen_by_query[sen_by_query["effective_seniority"] == sen]
+        subset = sen_by_query[sen_by_query["early_career_tier"] == sen]
         subset = subset.set_index("ingestion_query").reindex(query_order).reset_index()
         fig5.add_trace(go.Bar(
             name=label,
@@ -253,7 +253,7 @@ with col6:
 
     fig6 = go.Figure()
     for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
-        subset = sen_pct[sen_pct["effective_seniority"] == sen]
+        subset = sen_pct[sen_pct["early_career_tier"] == sen]
         subset = subset.set_index("ingestion_query").reindex(query_order).reset_index()
         fig6.add_trace(go.Bar(
             name=label,
@@ -313,9 +313,9 @@ with col7:
 
 with col8:
     # Salary by role x seniority — grouped bars
-    sal_listed = salary_df[salary_df["effective_seniority"].isin(SENIORITY_ORDER)].copy()
+    sal_listed = salary_df[salary_df["early_career_tier"].isin(SENIORITY_ORDER)].copy()
     sal_by_role_sen = (
-        sal_listed.groupby(["ingestion_query", "effective_seniority"])["salary_mid"]
+        sal_listed.groupby(["ingestion_query", "early_career_tier"])["salary_mid"]
         .agg(["median", "count"])
         .reset_index()
     )
