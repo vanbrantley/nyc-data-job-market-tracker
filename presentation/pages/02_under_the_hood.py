@@ -379,7 +379,8 @@ with col_exp:
 
     n_with_yrs = len(yrs_df)
     st.info(
-        f"Based on **{n_with_yrs} of {len(df)} postings** ({n_with_yrs/len(df):.0%}) that specified experience requirements.",
+        f"Based on **{n_with_yrs} of {len(df)} postings** ({n_with_yrs/len(df):.0%}) that specified "
+        f"both a listed seniority (Built In NYC / TheirStack only) and years of experience.",
         icon="📋",
     )
 

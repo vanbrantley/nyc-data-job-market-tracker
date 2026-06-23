@@ -440,21 +440,23 @@ if tracking_available:
     st.markdown("##### Run History & Efficiency")
 
     efficiency_rows = []
-    for _, run_row in runs_df.iterrows():
+    for _, run_row in runs_df.sort_values("run_at", ascending=False).iterrows():
         run_id = run_row["run_id"]
         run_usage = usage_df[usage_df["run_id"] == run_id]
-        total_credits = run_usage["credits_used_this_run"].sum() if len(run_usage) > 0 else 0
         total_jobs = run_row["total_rows"]
-        cpp = round(total_credits / total_jobs, 2) if (total_jobs > 0 and pd.notna(total_credits) and total_credits > 0) else None
+
+        jsearch_credits = run_usage.loc[run_usage["source"] == "jsearch", "credits_used_this_run"].sum()
+        theirstack_credits = run_usage.loc[run_usage["source"] == "theirstack", "credits_used_this_run"].sum()
+
         efficiency_rows.append({
             "Run": run_row["run_at"].strftime("%b %d, %Y %H:%M"),
             "Status": run_row["status"],
-            "JSearch": run_row["jsearch_rows"],
-            "TheirStack": run_row["theirstack_rows"],
-            "Built In": run_row["builtin_rows"],
+            "JSearch Jobs": run_row["jsearch_rows"],
+            "JSearch Credits": int(jsearch_credits) if pd.notna(jsearch_credits) else "—",
+            "TheirStack Jobs": run_row["theirstack_rows"],
+            "TheirStack Credits": int(theirstack_credits) if pd.notna(theirstack_credits) else "—",
+            "Built In Jobs": run_row["builtin_rows"],
             "Total Jobs": total_jobs,
-            "Credits Used": int(total_credits) if pd.notna(total_credits) and total_credits else "—",
-            "Credits / Job": cpp,
             "Duration (s)": round(run_row["duration_seconds"], 1),
         })
 
@@ -462,9 +464,6 @@ if tracking_available:
         pd.DataFrame(efficiency_rows),
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "Credits / Job": st.column_config.NumberColumn("Credits / Job", format="%.2f"),
-        }
     )
 
     # ── Forecast ──────────────────────────────────────────────────────────
