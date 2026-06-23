@@ -1,5 +1,5 @@
 """
-pages/02_job_explorer.py
+pages/03_job_explorer.py
 Job Explorer — filterable grid + expandable row detail panel.
 The "Job Truth-Finder": shows raw job postings alongside the LLM-enriched metadata.
 """
@@ -24,6 +24,7 @@ DEGREE_LABELS = {
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 df_full = load_fct_job_postings()
+df_full = df_full[df_full["title_role_bucket"] != "no_match"]
 
 st.title("🔍 Job Explorer")
 st.caption(
@@ -84,8 +85,8 @@ with st.sidebar:
         key="filter_techs"
     )
 
-    # Role (ingested query)
-    role_opts = sorted(df_full["ingestion_query"].dropna().unique().tolist())
+    # Role (classified from job title)
+    role_opts = sorted(df_full["title_role_bucket"].dropna().unique().tolist())
     sel_roles = st.multiselect(
         "Role",
         options=role_opts,
@@ -236,7 +237,7 @@ with st.sidebar:
 df = df_full.copy()
 
 if sel_roles:
-    df = df[df["ingestion_query"].isin(sel_roles)]
+    df = df[df["title_role_bucket"].isin(sel_roles)]
 if sel_work_models:
     df = df[df["work_model"].isin(sel_work_models)]
 if sel_emp_types:
@@ -315,7 +316,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     display = pd.DataFrame()
     display["Title"] = df["job_title"].fillna("—")
     display["Company"] = df["company_name"].fillna("—")
-    display["Role"] = df["ingestion_query"].fillna("—")
+    display["Role"] = df["title_role_bucket"].fillna("—")
     display["Work Model"] = df["work_model"].fillna("—")
     display["Source"] = df["source"].apply(lambda x: format_source(x) if pd.notna(x) else "—")
     display["sal_min"] = df["final_salary_min"].values

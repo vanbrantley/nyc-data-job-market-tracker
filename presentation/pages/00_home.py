@@ -132,7 +132,7 @@ with col_stats:
     stats = [
         ("Total Postings", len(df)),
         ("Companies", df["company_name"].nunique()),
-        ("Role Types Tracked", df["ingestion_query"].nunique()),
+        ("Role Types Tracked", df[df["title_role_bucket"] != "no_match"]["title_role_bucket"].nunique()),
         ("Sources", df["source"].nunique()),
         ("Last Ingestion", latest_str),
         ("With Salary Data", f"{df['final_salary_min'].notna().mean():.0%}"),

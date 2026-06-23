@@ -93,7 +93,6 @@ filtered as (
             LOWER(job_title),
             '.*(senior|sr\\.?|lead|principal|staff|manager|director|vp|vice president|avp|head of|architect|chief|svp|evp|gvp|president|officer|executive|leader).*'
           )
-      and not REGEXP_LIKE(LOWER(job_title), '^(orbis|owner)$')
 
 )
 

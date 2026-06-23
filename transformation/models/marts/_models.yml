@@ -98,6 +98,24 @@ models:
           seniority. NULL for jsearch (no structured seniority field) and for
           any row with listed_seniority outside this scale.
 
+      - name: title_role_bucket
+        description: >
+          Role classification derived by regex pattern-matching on job_title
+          into one of the four target roles (Data Analyst, Data Engineer,
+          Analytics Engineer, Data Scientist). Distinct from ingestion_query
+          (which search term surfaced the posting — found to mislabel
+          Analytics Engineer postings as Data Engineer due
+          to JSearch's loose topical matching) and role_archetype (LLM-inferred
+          from the full description, used for the title-vs-description
+          self-consistency analysis). title_role_bucket reflects only what the
+          posting's own title claims to be. Value is 'no_match' when the title
+          doesn't cleanly map to any of the four roles; these rows remain in
+          the mart rather than being filtered out, so the full dataset stays
+          queryable.
+        tests:
+          - accepted_values:
+              values: ['Data Analyst', 'Data Engineer', 'Analytics Engineer', 'Data Scientist', 'no_match']
+
       - name: inferred_seniority
         description: Seniority level inferred by GPT-4o-mini from the job description.
 

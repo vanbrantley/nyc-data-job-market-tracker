@@ -41,16 +41,21 @@ WORK_COLORS = {"remote": GREEN, "hybrid": AMBER, "onsite": BLUE}
 # ── Load & prep ────────────────────────────────────────────────────────────────
 df = load_fct_job_postings()
 
+# Exclude postings whose title didn't cleanly map to one of the four target
+# roles. These remain in the underlying mart (see Pipeline Health for the
+# breakdown) but are excluded here since every chart on this page groups by role.
+df = df[df["title_role_bucket"] != "no_match"]
+
 salary_df = df.dropna(subset=["final_salary_min", "final_salary_max"]).copy()
 salary_df["salary_mid"] = (salary_df["final_salary_min"] + salary_df["final_salary_max"]) / 2
 
-# Consistent query order — sort by volume descending so charts feel stable
-query_order = (
-    df["ingestion_query"].value_counts().index.tolist()
+# Consistent role order — sort by volume descending so charts feel stable
+role_order = (
+    df["title_role_bucket"].value_counts().index.tolist()
 )
-# Assign a color per query deterministically
-QUERY_COLOR_LIST = [BLUE, TEAL, AMBER, GREEN, PURPLE, RED]
-query_colors = {q: QUERY_COLOR_LIST[i % len(QUERY_COLOR_LIST)] for i, q in enumerate(query_order)}
+# Assign a color per role deterministically
+ROLE_COLOR_LIST = [BLUE, TEAL, AMBER, GREEN, PURPLE, RED]
+role_colors = {r: ROLE_COLOR_LIST[i % len(ROLE_COLOR_LIST)] for i, r in enumerate(role_order)}
 
 # ── Page header ────────────────────────────────────────────────────────────────
 st.title("🗺️ The Landscape")
@@ -61,8 +66,8 @@ st.caption(
 
 # ── KPI strip ──────────────────────────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Total Postings", len(df))
-k2.metric("Role Types", df["ingestion_query"].nunique())
+k1.metric("Postings", len(df))
+k2.metric("Role Types", df["title_role_bucket"].nunique())
 k3.metric("Companies Hiring", df["company_name"].nunique())
 k4.metric("Salary Disclosed", f"{len(salary_df) / len(df):.0%}")
 
@@ -70,13 +75,13 @@ st.divider()
 
 # ── Row 1: Postings by Role Type + Work Model by Role ─────────────────────────
 st.markdown("#### Postings by Role Type")
-st.caption("Total postings per query across all sources")
+st.caption("Total postings per role (classified from job title) across all sources")
 
 col1, col2 = st.columns([1, 1.4])
 
 with col1:
     role_counts = (
-        df.groupby("ingestion_query")
+        df.groupby("title_role_bucket")
         .size()
         .reset_index(name="count")
         .sort_values("count", ascending=True)
@@ -84,9 +89,9 @@ with col1:
 
     fig1 = go.Figure(go.Bar(
         x=role_counts["count"],
-        y=role_counts["ingestion_query"],
+        y=role_counts["title_role_bucket"],
         orientation="h",
-        marker_color=[query_colors[q] for q in role_counts["ingestion_query"]],
+        marker_color=[role_colors[r] for r in role_counts["title_role_bucket"]],
         text=role_counts["count"],
         textposition="outside",
         hovertemplate="%{y}: %{x} postings<extra></extra>",
@@ -100,31 +105,36 @@ with col1:
 
 with col2:
     st.markdown("#### Work Model by Role Type")
-    st.caption("Remote / hybrid / onsite split per query")
+    st.caption("Remote / hybrid / onsite share within each role (normalized to 100%, since role volumes differ)")
 
-    wm_by_query = (
-        df.groupby(["ingestion_query", "work_model"])
+    wm_by_role = (
+        df.groupby(["title_role_bucket", "work_model"])
         .size()
         .reset_index(name="count")
     )
+    wm_totals = wm_by_role.groupby("title_role_bucket")["count"].transform("sum")
+    wm_by_role["pct"] = wm_by_role["count"] / wm_totals
 
     fig2 = go.Figure()
     for wm in ["remote", "hybrid", "onsite"]:
-        subset = wm_by_query[wm_by_query["work_model"] == wm]
-        # align to query_order
-        subset = subset.set_index("ingestion_query").reindex(query_order).reset_index()
+        subset = wm_by_role[wm_by_role["work_model"] == wm]
+        # align to role_order
+        subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
         fig2.add_trace(go.Bar(
             name=wm.capitalize(),
-            x=subset["ingestion_query"],
-            y=subset["count"],
+            x=subset["title_role_bucket"],
+            y=subset["pct"],
             marker_color=WORK_COLORS.get(wm, MUTED),
-            hovertemplate=f"{wm.capitalize()}: %{{y}} postings<extra></extra>",
+            customdata=subset["count"],
+            hovertemplate=f"{wm.capitalize()}: %{{y:.0%}} (n=%{{customdata}})<extra></extra>",
+            text=[f"{v:.0%}" if pd.notna(v) else "" for v in subset["pct"]],
+            textposition="inside",
         ))
     fig2.update_layout(
         **CHART_LAYOUT, height=300,
         barmode="stack",
         xaxis=dict(gridcolor="#1e293b"),
-        yaxis=dict(title="# Postings", gridcolor="#1e293b", zeroline=False),
+        yaxis=dict(title="% of Postings", gridcolor="#1e293b", zeroline=False, tickformat=".0%"),
         legend=dict(orientation="h", y=-0.25, font=dict(size=10)),
     )
     st.plotly_chart(fig2, use_container_width=True)
@@ -168,32 +178,32 @@ if source_filter:
 freq_df["_date"] = pd.to_datetime(freq_df[date_col]).dt.date
 
 freq_grouped = (
-    freq_df.groupby(["_date", "ingestion_query"])
+    freq_df.groupby(["_date", "title_role_bucket"])
     .size()
     .reset_index(name="count")
 )
 
-# Make cumulative per query
+# Make cumulative per role
 freq_grouped = freq_grouped.sort_values("_date")
-freq_grouped["cumulative"] = freq_grouped.groupby("ingestion_query")["count"].cumsum()
+freq_grouped["cumulative"] = freq_grouped.groupby("title_role_bucket")["count"].cumsum()
 
 with freq_col:
     st.caption(
-        f"Postings per query grouped by **{time_axis.lower()}** — "
+        f"Postings per role grouped by **{time_axis.lower()}** — "
         f"{'all sources' if not source_filter else ', '.join(SOURCE_LABELS[s] for s in source_filter)}"
     )
 
     fig3 = go.Figure()
-    for query in query_order:
-        subset = freq_grouped[freq_grouped["ingestion_query"] == query].sort_values("_date")
+    for role in role_order:
+        subset = freq_grouped[freq_grouped["title_role_bucket"] == role].sort_values("_date")
         fig3.add_trace(go.Scatter(
             x=subset["_date"],
             y=subset["cumulative"],
             mode="lines+markers",
-            name=query,
-            line=dict(color=query_colors[query], width=2),
+            name=role,
+            line=dict(color=role_colors[role], width=2),
             marker=dict(size=6),
-            hovertemplate=f"{query}: %{{y}} total postings as of %{{x}}<extra></extra>",
+            hovertemplate=f"{role}: %{{y}} total postings as of %{{x}}<extra></extra>",
         ))
     fig3.update_layout(
         **CHART_LAYOUT, height=320,
@@ -214,8 +224,8 @@ st.caption(
     f"(JSearch has no structured seniority field). n={len(listed_df)}."
 )
 
-sen_by_query = (
-        listed_df.groupby(["ingestion_query", "early_career_tier"])
+sen_by_role = (
+        listed_df.groupby(["title_role_bucket", "early_career_tier"])
         .size()
         .reset_index(name="count")
     )
@@ -226,11 +236,11 @@ with col5:
 
     fig5 = go.Figure()
     for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
-        subset = sen_by_query[sen_by_query["early_career_tier"] == sen]
-        subset = subset.set_index("ingestion_query").reindex(query_order).reset_index()
+        subset = sen_by_role[sen_by_role["early_career_tier"] == sen]
+        subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
         fig5.add_trace(go.Bar(
             name=label,
-            x=subset["ingestion_query"],
+            x=subset["title_role_bucket"],
             y=subset["count"],
             marker_color=color,
             hovertemplate=f"{label}: %{{y}} postings<extra></extra>",
@@ -246,18 +256,18 @@ with col5:
     st.plotly_chart(fig5, use_container_width=True)
 
 with col6:
-    # Normalize to % within each query
-    sen_pct = sen_by_query.copy()
-    totals = sen_pct.groupby("ingestion_query")["count"].transform("sum")
+    # Normalize to % within each role
+    sen_pct = sen_by_role.copy()
+    totals = sen_pct.groupby("title_role_bucket")["count"].transform("sum")
     sen_pct["pct"] = sen_pct["count"] / totals
 
     fig6 = go.Figure()
     for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
         subset = sen_pct[sen_pct["early_career_tier"] == sen]
-        subset = subset.set_index("ingestion_query").reindex(query_order).reset_index()
+        subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
         fig6.add_trace(go.Bar(
             name=label,
-            x=subset["ingestion_query"],
+            x=subset["title_role_bucket"],
             y=subset["pct"],
             marker_color=color,
             hovertemplate=f"{label}: %{{customdata:.0%}} of labeled postings<extra></extra>",
@@ -287,21 +297,21 @@ st.caption(
 col7, col8 = st.columns(2)
 
 with col7:
-    arch_sal = (
-        salary_df.groupby("ingestion_query")["salary_mid"]
+    role_sal = (
+        salary_df.groupby("title_role_bucket")["salary_mid"]
         .agg(["median", "count"])
         .reset_index()
     )
-    arch_sal.columns = ["query", "median", "n"]
-    arch_sal = arch_sal.sort_values("median", ascending=False)
+    role_sal.columns = ["role", "median", "n"]
+    role_sal = role_sal.sort_values("median", ascending=False)
 
     fig7 = go.Figure(go.Bar(
-        x=arch_sal["query"],
-        y=arch_sal["median"],
-        marker_color=[query_colors[q] for q in arch_sal["query"]],
-        text=[f"＄{v/1000:.0f}k" for v in arch_sal["median"]],
+        x=role_sal["role"],
+        y=role_sal["median"],
+        marker_color=[role_colors[r] for r in role_sal["role"]],
+        text=[f"＄{v/1000:.0f}k" for v in role_sal["median"]],
         textposition="outside",
-        customdata=arch_sal["n"].values,
+        customdata=role_sal["n"].values,
         hovertemplate="%{x}: ＄%{y:,.0f} median (n=%{customdata} with salary)<extra></extra>",
     ))
     fig7.update_layout(
@@ -315,19 +325,19 @@ with col8:
     # Salary by role x seniority — grouped bars
     sal_listed = salary_df[salary_df["early_career_tier"].isin(SENIORITY_ORDER)].copy()
     sal_by_role_sen = (
-        sal_listed.groupby(["ingestion_query", "early_career_tier"])["salary_mid"]
+        sal_listed.groupby(["title_role_bucket", "early_career_tier"])["salary_mid"]
         .agg(["median", "count"])
         .reset_index()
     )
-    sal_by_role_sen.columns = ["query", "seniority", "median", "n"]
+    sal_by_role_sen.columns = ["role", "seniority", "median", "n"]
 
     fig8 = go.Figure()
     for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
         subset = sal_by_role_sen[sal_by_role_sen["seniority"] == sen]
-        subset = subset.set_index("query").reindex(query_order).reset_index()
+        subset = subset.set_index("role").reindex(role_order).reset_index()
         fig8.add_trace(go.Bar(
             name=label,
-            x=subset["query"],
+            x=subset["role"],
             y=subset["median"],
             marker_color=color,
             customdata=subset["n"].values,

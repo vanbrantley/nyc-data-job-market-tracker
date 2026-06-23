@@ -101,6 +101,26 @@ joined as (
             else null
         end                                          as early_career_tier,
 
+        -- title_role_bucket: regex classification of job_title into one of the
+        -- four target roles. Distinct from ingestion_query (which search term
+        -- surfaced this posting — found to be unreliable for Analytics Engineer,
+        -- which JSearch conflates with Data Engineer ~36% of the time) and from
+        -- role_archetype (LLM-inferred from the full description, used for the
+        -- title-vs-actual-content self-consistency analysis). title_role_bucket
+        -- answers only "what does this posting's title literally say it is."
+        -- 'no_match' = title didn't cleanly map to any of the four roles; kept
+        -- in the mart rather than filtered out, so the full picture stays
+        -- queryable. See Pipeline Health page for the no_match breakdown.
+        case
+            when j.job_title ilike '%analytics engineer%' then 'Analytics Engineer'
+            when j.job_title ilike '%data scientist%'
+                 or j.job_title ilike '%data science%engineer%' then 'Data Scientist'
+            when j.job_title ilike '%data%engineer%' then 'Data Engineer'
+            when j.job_title ilike '%data%analyst%'
+                 or j.job_title ilike '%data analytics%' then 'Data Analyst'
+            else 'no_match'
+        end                                          as title_role_bucket,
+
         -- salary: prefer structured payload value, fall back to LLM estimate
         COALESCE(j.salary_min, e.llm_salary_min)   as final_salary_min,
         COALESCE(j.salary_max, e.llm_salary_max)   as final_salary_max,

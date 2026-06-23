@@ -1,5 +1,5 @@
 """
-pages/03_pipeline_health.py
+pages/04_pipeline_health.py
 Pipeline Health & Metadata — the "clencher" page.
 Shows internal pipeline mechanics: ingestion trends, LLM enrichment quality, architecture.
 """
@@ -35,6 +35,9 @@ tech_stack_rate = tech_stack_populated / total_rows if total_rows else 0
 latest_ingestion = df["ingested_at"].max()
 latest_str = latest_ingestion.strftime("%b %d, %Y %H:%M UTC") if pd.notna(latest_ingestion) else "—"
 
+no_match_n = int(df[df["title_role_bucket"] == "no_match"].shape[0])
+no_match_pct = no_match_n / total_rows if total_rows else 0
+
 st.markdown("#### System Status")
 m1, m2, m3, m4, m5 = st.columns(5)
 
@@ -68,6 +71,13 @@ with m5:
         f'<div class="metric-label">Last Pipeline Run</div></div>',
         unsafe_allow_html=True,
     )
+
+st.caption(
+    f"This page reflects all {total_rows} postings in the mart, including "
+    f"{no_match_n} ({no_match_pct:.0%}) with a title that didn't cleanly classify into "
+    f"one of the four target roles. Other pages exclude these — see Title Classification "
+    f"Health below for details."
+)
 
 st.markdown("")
 
@@ -242,6 +252,72 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
 )
+
+# ── Title Classification Health ───────────────────────────────────────────────
+st.markdown("#### Title Classification Health")
+st.caption(
+    "Every posting's job title is regex-classified into one of four target roles "
+    "(Data Analyst, Data Engineer, Analytics Engineer, Data Scientist). Postings whose "
+    "title doesn't cleanly map to any of the four are flagged `no_match` — included in "
+    "the underlying dataset, but excluded from role-grouped charts elsewhere in this dashboard."
+)
+
+bucket_counts = df["title_role_bucket"].value_counts().reset_index()
+bucket_counts.columns = ["bucket", "count"]
+bucket_counts["pct"] = bucket_counts["count"] / bucket_counts["count"].sum()
+
+tc_col1, tc_col2 = st.columns([1, 1.4])
+
+with tc_col1:
+    fig_bucket = go.Figure(go.Bar(
+        x=bucket_counts["count"],
+        y=bucket_counts["bucket"],
+        orientation="h",
+        marker_color=["#ef4444" if b == "no_match" else "#3b82f6" for b in bucket_counts["bucket"]],
+        text=[f"{c} ({p:.0%})" for c, p in zip(bucket_counts["count"], bucket_counts["pct"])],
+        textposition="outside",
+    ))
+    fig_bucket.update_layout(
+        title="Postings by Title Classification",
+        margin=dict(l=0, r=60, t=40, b=0),
+        height=370,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        xaxis_title="# Postings",
+        yaxis_title="",
+        showlegend=False,
+    )
+    st.plotly_chart(fig_bucket, use_container_width=True)
+
+with tc_col2:
+    st.metric("Unclassified Titles", f"{no_match_n} ({no_match_pct:.0%})")
+    st.caption("All unclassified titles (scroll for more):")
+    all_no_match = (
+        df[df["title_role_bucket"] == "no_match"]
+        [["job_title", "source", "ingestion_query"]]
+        .rename(columns={"job_title": "Title", "source": "Source", "ingestion_query": "Ingestion Query"})
+    )
+    st.dataframe(all_no_match, use_container_width=True, hide_index=True, height=240)
+
+st.markdown("##### Search Query Reliability")
+st.caption(
+    "How often does the search query that surfaced a posting (`ingestion_query`) match "
+    "what the title actually says (`title_role_bucket`)? Lower agreement suggests a source's "
+    "search is pulling in adjacent roles rather than the one actually queried."
+)
+
+reliability_rows = []
+for q in sorted(df["ingestion_query"].dropna().unique()):
+    q_df = df[df["ingestion_query"] == q]
+    matches = (q_df["title_role_bucket"] == q).sum()
+    reliability_rows.append({
+        "Ingestion Query": q,
+        "Postings": len(q_df),
+        "Title Matches Query": matches,
+        "Agreement Rate": f"{matches/len(q_df):.0%}" if len(q_df) else "—",
+    })
+
+st.dataframe(pd.DataFrame(reliability_rows), use_container_width=True, hide_index=True)
 
 # ── API Usage Tracking ────────────────────────────────────────────────────────
 st.markdown("#### API Credit Usage")
