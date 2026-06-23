@@ -36,8 +36,8 @@ FILTER_KEYS = [
     "filter_techs", "filter_archetypes", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
     "filter_salary", "filter_dates", "filter_title", "filter_salary_only",
-    "filter_listed_seniority", "filter_domain",
-    "filter_acknowledges_ai", "filter_encourages_applicants",
+    "filter_listed_seniority", "filter_listed_seniority_only", "filter_inferred_seniority",
+    "filter_domain", "filter_acknowledges_ai", "filter_encourages_applicants",
 ]
 
 salary_df = df_full.dropna(subset=["final_salary_min", "final_salary_max"])
@@ -61,6 +61,8 @@ with st.sidebar:
         st.session_state["filter_title"] = ""
         st.session_state["filter_salary_only"] = False
         st.session_state["filter_listed_seniority"] = []
+        st.session_state["filter_listed_seniority_only"] = False
+        st.session_state["filter_inferred_seniority"] = []
         st.session_state["filter_domain"] = []
         st.session_state["filter_acknowledges_ai"] = False
         st.session_state["filter_encourages_applicants"] = False
@@ -104,6 +106,17 @@ with st.sidebar:
         key="filter_listed_seniority"
     )
 
+    # LLM inferred seniority
+    inferred_sen_opts = sorted(df_full["inferred_seniority"].dropna().unique().tolist())
+    sel_inferred_seniority = st.multiselect(
+        "LLM Inferred Seniority",
+        options=inferred_sen_opts,
+        format_func=format_snake_case,
+        default=[],
+        placeholder="All seniority levels",
+        key="filter_inferred_seniority"
+    )
+
     # Work model
     work_models = sorted(df_full["work_model"].dropna().unique().tolist())
     sel_work_models = st.multiselect(
@@ -119,6 +132,7 @@ with st.sidebar:
     sel_emp_types = st.multiselect(
         "Employment Type",
         options=emp_types,
+        format_func=format_snake_case,
         default=[],
         placeholder="All types",
         key="filter_emp_types"
@@ -203,7 +217,14 @@ with st.sidebar:
 
     salary_only = st.checkbox(
         "Show jobs with salary data only",
+        value=False,
         key="filter_salary_only"
+    )
+
+    listed_seniority_only = st.checkbox(
+        "Show jobs with listed seniority only",
+        value=False,
+        key="filter_listed_seniority_only"
     )
 
     st.divider()
@@ -226,6 +247,8 @@ if sel_degrees:
     df = df[df["degree_requirement"].isin(sel_degrees)]
 if sel_listed_seniority:
     df = df[df["listed_seniority"].isin(sel_listed_seniority)]
+if sel_inferred_seniority:
+    df = df[df["inferred_seniority"].isin(sel_inferred_seniority)]
 if sel_domain:
     df = df[df["domain"].isin(sel_domain)]
 if sel_acknowledges_ai:
@@ -270,6 +293,9 @@ if title_search:
 
 if st.session_state.get("filter_salary_only"):
     df = df[df["final_salary_min"].notna() & df["final_salary_max"].notna()]
+
+if st.session_state.get("filter_listed_seniority_only"):
+    df = df[df["listed_seniority"].notna()]
 
 # ── Summary bar ───────────────────────────────────────────────────────────────
 total = len(df_full)
@@ -418,7 +444,11 @@ with col_left:
     arch = str(job.get("role_archetype") or "—").replace("_", " ").title()
     focus = str(job.get("work_focus") or "—").replace("_", " ").title()
     inferred_sen = str(job.get("inferred_seniority") or "—").replace("_", " ").title()
-    listed_sen = str(job.get("listed_seniority") or "—").replace("_", " ").title()
+    listed_sen = (
+        "—"
+        if pd.isna(job.get("listed_seniority"))
+        else str(job.get("listed_seniority")).replace("_", " ").title()
+    )
     degree_raw = job.get("degree_requirement")
     degree = DEGREE_LABELS.get(degree_raw, str(degree_raw or "—").replace("_", " ").title())
     confidence = job.get("confidence_score")
