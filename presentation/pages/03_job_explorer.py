@@ -12,7 +12,7 @@ import streamlit as st
 from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from data_loader import load_fct_job_postings, format_salary, format_source, format_snake_case
+from data_loader import load_fct_job_postings, format_salary, format_source, format_seniority, format_label
 
 
 DEGREE_LABELS = {
@@ -33,7 +33,7 @@ st.caption(
 
 # ── Sidebar filters ───────────────────────────────────────────────────────────
 FILTER_KEYS = [
-    "filter_techs", "filter_archetypes", "filter_work_models",
+    "filter_techs", "filter_roles", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
     "filter_salary", "filter_dates", "filter_title", "filter_salary_only",
     "filter_listed_seniority", "filter_listed_seniority_only", "filter_inferred_seniority",
@@ -51,7 +51,7 @@ with st.sidebar:
 
     if st.session_state.get("pending_clear"):
         st.session_state["filter_techs"] = []
-        st.session_state["filter_archetypes"] = []
+        st.session_state["filter_roles"] = []
         st.session_state["filter_work_models"] = []
         st.session_state["filter_emp_types"] = []
         st.session_state["filter_sources"] = []
@@ -84,15 +84,14 @@ with st.sidebar:
         key="filter_techs"
     )
 
-    # Role archetype
-    raw_archetypes = sorted(df_full["role_archetype"].dropna().unique().tolist())
-    sel_archetypes = st.multiselect(
-        "Role Archetype",
-        options=raw_archetypes,
-        format_func=format_snake_case,
+    # Role (ingested query)
+    role_opts = sorted(df_full["ingestion_query"].dropna().unique().tolist())
+    sel_roles = st.multiselect(
+        "Role",
+        options=role_opts,
         default=[],
-        placeholder="All archetypes",
-        key="filter_archetypes"
+        placeholder="All roles",
+        key="filter_roles"
     )
 
     # Listed seniority
@@ -100,7 +99,7 @@ with st.sidebar:
     sel_listed_seniority = st.multiselect(
         "Listed Seniority",
         options=listed_sen_opts,
-        format_func=format_snake_case,
+        format_func=format_seniority,
         default=[],
         placeholder="All seniority levels",
         key="filter_listed_seniority"
@@ -111,7 +110,7 @@ with st.sidebar:
     sel_inferred_seniority = st.multiselect(
         "LLM Inferred Seniority",
         options=inferred_sen_opts,
-        format_func=format_snake_case,
+        format_func=format_seniority,
         default=[],
         placeholder="All seniority levels",
         key="filter_inferred_seniority"
@@ -122,6 +121,7 @@ with st.sidebar:
     sel_work_models = st.multiselect(
         "Work Model",
         options=work_models,
+        format_func=format_label,
         default=[],
         placeholder="All models",
         key="filter_work_models"
@@ -132,7 +132,7 @@ with st.sidebar:
     sel_emp_types = st.multiselect(
         "Employment Type",
         options=emp_types,
-        format_func=format_snake_case,
+        format_func=format_label,
         default=[],
         placeholder="All types",
         key="filter_emp_types"
@@ -154,7 +154,7 @@ with st.sidebar:
     sel_degrees = st.multiselect(
         "Degree Requirement",
         options=degree_opts,
-        format_func=lambda x: DEGREE_LABELS.get(x, format_snake_case(x)),
+        format_func=lambda x: DEGREE_LABELS.get(x, format_label(x)),
         default=[],
         placeholder="Any requirement",
         key="filter_degrees"
@@ -235,8 +235,8 @@ with st.sidebar:
 # ── Apply filters ─────────────────────────────────────────────────────────────
 df = df_full.copy()
 
-if sel_archetypes:
-    df = df[df["role_archetype"].isin(sel_archetypes)]
+if sel_roles:
+    df = df[df["ingestion_query"].isin(sel_roles)]
 if sel_work_models:
     df = df[df["work_model"].isin(sel_work_models)]
 if sel_emp_types:
@@ -315,9 +315,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     display = pd.DataFrame()
     display["Title"] = df["job_title"].fillna("—")
     display["Company"] = df["company_name"].fillna("—")
-    display["Archetype"] = df["role_archetype"].apply(
-        lambda x: x.replace("_", " ") if pd.notna(x) and x else "—"
-    )
+    display["Role"] = df["ingestion_query"].fillna("—")
     display["Work Model"] = df["work_model"].fillna("—")
     display["Source"] = df["source"].apply(lambda x: format_source(x) if pd.notna(x) else "—")
     display["sal_min"] = df["final_salary_min"].values
@@ -328,7 +326,7 @@ def make_display_df(df: pd.DataFrame) -> pd.DataFrame:
     return display
 
 display_df = make_display_df(df)
-visible_cols = ["Title", "Company", "Archetype", "Work Model", "Source", "sal_min", "sal_max", "Posted"]
+visible_cols = ["Title", "Company", "Role", "Work Model", "Source", "sal_min", "sal_max", "Posted"]
 
 st.markdown("#### Postings")
 
@@ -404,7 +402,7 @@ with col_left:
 
     meta_html = (
         f'<span class="tag-pill {wm_color}">{job.get("work_model", "—")}</span>'
-        f'<span class="tag-pill {et_color}">{str(job.get("employment_type","—")).replace("_"," ")}</span>'
+        f'<span class="tag-pill {et_color}">{format_label(job.get("employment_type")) or "—"}</span>'
         f'<span class="tag-pill tag-purple">{format_source(job.get("source","—"))}</span>'
     )
     if job.get("explicitly_encourages_applicants"):
@@ -441,16 +439,12 @@ with col_left:
     # LLM enrichment section
     st.markdown("##### 🔩 AI Enrichment")
 
-    arch = str(job.get("role_archetype") or "—").replace("_", " ").title()
-    focus = str(job.get("work_focus") or "—").replace("_", " ").title()
-    inferred_sen = str(job.get("inferred_seniority") or "—").replace("_", " ").title()
-    listed_sen = (
-        "—"
-        if pd.isna(job.get("listed_seniority"))
-        else str(job.get("listed_seniority")).replace("_", " ").title()
-    )
+    arch = format_label(job.get("role_archetype")) or "—"
+    focus = format_label(job.get("work_focus")) or "—"
+    inferred_sen = format_seniority(job.get("inferred_seniority"))
+    listed_sen = format_seniority(job.get("listed_seniority"))
     degree_raw = job.get("degree_requirement")
-    degree = DEGREE_LABELS.get(degree_raw, str(degree_raw or "—").replace("_", " ").title())
+    degree = DEGREE_LABELS.get(degree_raw, format_label(degree_raw) or "—")
     confidence = job.get("confidence_score")
     conf_str = f"{confidence:.0%}" if pd.notna(confidence) else "—"
 
@@ -467,7 +461,7 @@ with col_left:
 
     enrich_cols = st.columns(2)
     with enrich_cols[0]:
-        st.markdown(f"**Archetype:** {arch}")
+        st.markdown(f"**Inferred Archetype:** {arch}")
         st.markdown(f"**Work Focus:** {focus}")
         st.markdown(f"**Inferred Seniority:** {inferred_sen}")
         st.markdown(f"**Listed Seniority:** {listed_sen}")

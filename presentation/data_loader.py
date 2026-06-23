@@ -140,8 +140,26 @@ def format_source(val: str) -> str:
     }
     return overrides.get(val, val) if val else val
 
-def format_snake_case(val: str) -> str:
-    return val.replace("_", " ") if val else val
+# def format_snake_case(val: str) -> str:
+#     return val.replace("_", " ") if val else val
+
+def format_label(val: str) -> str:
+    """Title-cases a snake_case value for display (e.g. 'mid_level' -> 'Mid Level')."""
+    return val.replace("_", " ").title() if val else val
+
+SENIORITY_LABELS = {
+    "entry": "Entry Level",
+    "entry_level": "Entry Level",
+    "junior": "Junior",
+    "mid": "Mid Level",
+    "mid_level": "Mid Level",
+    "senior": "Senior",
+}
+
+def format_seniority(val: str) -> str:
+    if not val or pd.isna(val):
+        return "—"
+    return SENIORITY_LABELS.get(val, format_label(val))
 
 def format_salary(min_val, max_val) -> str:
     """Format a salary range for display."""
