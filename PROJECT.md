@@ -278,10 +278,14 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 
 **Pages:**
 1. **Home** (`00_home.py`) — framing, the question, the four roles, how the data is collected
-2. **The Landscape** (`01_landscape.py`) — volume, frequency over time, work model, seniority distribution, salary by role type
-3. **Under the Hood** (`02_under_the_hood.py`) — tech stack and paradigm heatmaps, title vs LLM archetype confusion matrix, AI blindspot, experience and degree requirements
-4. **Job Explorer** (`03_job_explorer.py`) — filterable grid + expandable detail panel
-5. **Pipeline Health** (`04_pipeline_health.py`) — API credit tracking, run history
+2. **The Landscape** (`01_landscape.py`) — volume, frequency over time, work model, seniority distribution (% share), salary by role type, experience requirements, degree requirements
+3. **Under the Hood** (`02_under_the_hood.py`) — tech stack and paradigm heatmaps, listed title vs. LLM archetype confusion matrix, listed vs. LLM-inferred seniority confusion matrix, the AI blind spot, industry domain breakdown (top 10 + role composition)
+4. **Job Explorer** (`02_job_explorer.py`) — filterable grid + expandable detail panel
+5. **Pipeline Health** (`04_pipeline_health.py`) — API credit tracking, run history, title classification health, search query reliability
+
+**Page organizing principle:** Landscape covers baseline facts about a posting (what it is, who wants it, what it pays, what it takes to qualify). Under the Hood covers content and divergence — what's actually inside a posting, and where it diverges from what it claims to be (skills, methods, title-vs-reality, AI signal, industry concentration).
+
+**Role grouping:** All role-grouped charts use `title_role_bucket` (regex-classified from `job_title`), not `ingestion_query` (which search term surfaced the posting). `ingestion_query` was found to mislabel ~36% of Analytics Engineer postings as Data Engineer due to JSearch's loose topical search matching — see Known Issues. `ingestion_query` is retained only on the Pipeline Health page, specifically to measure this search-reliability gap. Charts exclude `title_role_bucket = 'no_match'` rows (titles that didn't cleanly map to one of the four target roles); these rows remain in the mart and are visible on Pipeline Health.
 
 **Key patterns:**
 - `＄` (unicode fullwidth U+FF04) used for salary display — avoids Streamlit LaTeX parsing of `$`
@@ -289,7 +293,9 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 - Dynamic `df_key` incrementing to force dataframe widget re-render on filter change
 - `date_posted` kept as datetime in display dataframe, formatted via `st.column_config.DateColumn` — ensures correct click-to-sort behavior
 - All data loaded via `load_fct_job_postings()` with 1-hour cache
-- `early_career_tier` computed in the dbt mart (`int_jobs_unioned.sql`) — no longer derived at runtime in `data_loader.py`
+- `early_career_tier` and `title_role_bucket` both computed in the dbt mart (`int_jobs_unioned.sql`) — derived fields live in the transformation layer, not at runtime in `data_loader.py`
+- Stacked % share charts (seniority, degree, work model) call `.fillna(0)` on the percentage column after `reindex()` — a role with zero postings in a given category produces a `NaN`, not a `0`, after reindexing, which breaks Plotly's stack height in `barmode="stack"` and silently truncates the bar below 100%
+- `format_seniority()` and `format_label()` (in `data_loader.py`) are the shared display-formatting functions — `format_seniority()` normalizes `listed_seniority`'s vocabulary (`entry_level`, `mid_level`, etc.) and `inferred_seniority`'s vocabulary (`entry`, `mid`, etc.) to the same display labels; `format_label()` handles generic snake_case → Title Case for everything else
 
 ---
 

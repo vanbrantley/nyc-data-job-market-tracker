@@ -36,7 +36,7 @@ st.caption(
 FILTER_KEYS = [
     "filter_techs", "filter_roles", "filter_work_models",
     "filter_emp_types", "filter_sources", "filter_degrees",
-    "filter_salary", "filter_dates", "filter_title", "filter_salary_only",
+    "filter_salary", "filter_date_preset", "filter_title", "filter_salary_only",
     "filter_listed_seniority", "filter_listed_seniority_only", "filter_inferred_seniority",
     "filter_domain", "filter_acknowledges_ai", "filter_encourages_applicants",
 ]
@@ -44,8 +44,6 @@ FILTER_KEYS = [
 salary_df = df_full.dropna(subset=["final_salary_min", "final_salary_max"])
 sal_min_overall = int(salary_df["final_salary_min"].min()) if len(salary_df) else 0
 sal_max_overall = min(int(salary_df["final_salary_max"].max()), 300_000) if len(salary_df) else 300_000
-date_min = df_full["date_posted"].min().date() if df_full["date_posted"].notna().any() else None
-date_max = df_full["date_posted"].max().date() if df_full["date_posted"].notna().any() else None
 
 with st.sidebar:
     st.markdown("### Filters")
@@ -58,7 +56,7 @@ with st.sidebar:
         st.session_state["filter_sources"] = []
         st.session_state["filter_degrees"] = []
         st.session_state["filter_salary"] = (sal_min_overall, sal_max_overall)
-        st.session_state["filter_dates"] = (date_min, date_max)
+        st.session_state["filter_date_preset"] = "All Time"
         st.session_state["filter_title"] = ""
         st.session_state["filter_salary_only"] = False
         st.session_state["filter_listed_seniority"] = []
@@ -69,21 +67,20 @@ with st.sidebar:
         st.session_state["filter_encourages_applicants"] = False
         st.session_state["pending_clear"] = False
 
-    # Tech stacks
-    tech_counts = Counter(
-        t for row in df_full["tech_stack_required"] + df_full["tech_stack_preferred"]
-        if isinstance(row, list)
-        for t in row
-        if isinstance(t, str)
+    # Date posted — quick presets
+    date_preset = st.radio(
+        "Date Posted",
+        options=["All Time", "Past 3 Days", "Past Week", "Past Month"],
+        index=0,
+        key="filter_date_preset",
     )
-    all_techs = [tech for tech, _ in tech_counts.most_common()]
-    sel_techs = st.multiselect(
-        "Tech Stack",
-        options=all_techs,
-        default=[],
-        placeholder="Any technology",
-        key="filter_techs"
-    )
+
+    if date_preset == "All Time":
+        date_range = None
+    else:
+        days_map = {"Past 3 Days": 3, "Past Week": 7, "Past Month": 30}
+        cutoff = pd.Timestamp.now().normalize() - pd.Timedelta(days=days_map[date_preset])
+        date_range = (cutoff.date(), pd.Timestamp.now().date())
 
     # Role (classified from job title)
     role_opts = sorted(df_full["title_role_bucket"].dropna().unique().tolist())
@@ -117,6 +114,28 @@ with st.sidebar:
         key="filter_inferred_seniority"
     )
 
+    # Salary slider
+    salary_range = st.slider(
+        "Salary Range (where disclosed)",
+        min_value=sal_min_overall,
+        max_value=sal_max_overall,
+        value=(sal_min_overall, sal_max_overall),
+        step=5_000,
+        format="$%d",
+        key="filter_salary"
+    )
+
+    # Degree requirement
+    degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
+    sel_degrees = st.multiselect(
+        "Degree Requirement",
+        options=degree_opts,
+        format_func=lambda x: DEGREE_LABELS.get(x, format_label(x)),
+        default=[],
+        placeholder="Any requirement",
+        key="filter_degrees"
+    )
+
     # Work model
     work_models = sorted(df_full["work_model"].dropna().unique().tolist())
     sel_work_models = st.multiselect(
@@ -126,6 +145,33 @@ with st.sidebar:
         default=[],
         placeholder="All models",
         key="filter_work_models"
+    )
+
+    # Industry
+    domain_opts = sorted(df_full["domain"].dropna().unique().tolist())
+    sel_domain = st.multiselect(
+        "Industry",
+        options=domain_opts,
+        format_func=lambda x: x.capitalize(),
+        default=[],
+        placeholder="All industries",
+        key="filter_domain"
+    )
+
+    # Tech stacks
+    tech_counts = Counter(
+        t for row in df_full["tech_stack_required"] + df_full["tech_stack_preferred"]
+        if isinstance(row, list)
+        for t in row
+        if isinstance(t, str)
+    )
+    all_techs = [tech for tech, _ in tech_counts.most_common()]
+    sel_techs = st.multiselect(
+        "Tech Stack",
+        options=all_techs,
+        default=[],
+        placeholder="Any technology",
+        key="filter_techs"
     )
 
     # Employment type
@@ -150,27 +196,12 @@ with st.sidebar:
         key="filter_sources"
     )
 
-    # Degree requirement
-    degree_opts = sorted(df_full["degree_requirement"].dropna().unique().tolist())
-    sel_degrees = st.multiselect(
-        "Degree Requirement",
-        options=degree_opts,
-        format_func=lambda x: DEGREE_LABELS.get(x, format_label(x)),
-        default=[],
-        placeholder="Any requirement",
-        key="filter_degrees"
-    )
-
-    # Domain
-    domain_opts = sorted(df_full["domain"].dropna().unique().tolist())
-    sel_domain = st.multiselect(
-        "Industry",
-        options=domain_opts,
-        format_func=lambda x: x.capitalize(),
-        default=[],
-        placeholder="All industries",
-        key="filter_domain"
-    )
+    # Title search
+    title_search = st.text_input(
+        "Search Title / Company",
+        placeholder="e.g. analyst, Stripe",
+        key="filter_title"
+    ).strip().lower()
 
     # Acknowledges AI
     sel_acknowledges_ai = st.checkbox(
@@ -178,43 +209,6 @@ with st.sidebar:
         value=False,
         key="filter_acknowledges_ai"
     )
-
-    # Explicitly encourages applicants
-    sel_encourages = st.checkbox(
-        "Encourages Underqualified Applicants",
-        value=False,
-        key="filter_encourages_applicants"
-    )
-
-    # Salary slider
-    salary_range = st.slider(
-        "Salary Range (where disclosed)",
-        min_value=sal_min_overall,
-        max_value=sal_max_overall,
-        value=(sal_min_overall, sal_max_overall),
-        step=5_000,
-        format="$%d",
-        key="filter_salary"
-    )
-
-    # Date posted range
-    if df_full["date_posted"].notna().any():
-        date_range = st.date_input(
-            "Date Posted",
-            value=(date_min, date_max),
-            min_value=date_min,
-            max_value=date_max,
-            key="filter_dates"
-        )
-    else:
-        date_range = None
-
-    # Title search
-    title_search = st.text_input(
-        "Search Title / Company",
-        placeholder="e.g. analyst, Stripe",
-        key="filter_title"
-    ).strip().lower()
 
     salary_only = st.checkbox(
         "Show jobs with salary data only",
@@ -226,6 +220,13 @@ with st.sidebar:
         "Show jobs with listed seniority only",
         value=False,
         key="filter_listed_seniority_only"
+    )
+
+    # Explicitly encourages applicants
+    sel_encourages = st.checkbox(
+        "Encourages Underqualified Applicants",
+        value=False,
+        key="filter_encourages_applicants"
     )
 
     st.divider()

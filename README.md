@@ -8,9 +8,9 @@ A production data pipeline that tracks early-career data job postings in New Yor
 
 ## What It Does
 
-The NYC job market for data roles is noisy. Job titles are inflated, seniority labels are inconsistent, and raw postings bury the signal in walls of boilerplate. Worse, the lines between role types are blurry — "Analytics Engineer" and "Data Engineer" postings often describe nearly identical work under different names.
+The NYC job market for data roles is noisy. Job titles are inflated, seniority labels are inconsistent, and raw postings bury the signal in walls of boilerplate. The lines between role types — particularly Analytics Engineer and Data Engineer — are often assumed to be blurry, with postings seemingly describing similar work under different names.
 
-This pipeline cuts through that: it collects every relevant entry- and mid-level posting it can find, then sends each description through an LLM to extract structured, comparable metadata — actual tech stack, inferred seniority, role archetype, AI awareness, title accuracy — and presents it all in a dashboard built to compare what a job is *called* against what it actually *is*.
+This pipeline cuts through that: it collects every relevant entry- and mid-level posting it can find, then sends each description through an LLM to extract structured, comparable metadata — actual tech stack, inferred seniority, role archetype, and AI awareness — and compares that against the posting's own title to see where the two actually agree or diverge. The result complicates the original assumption: once title-vs-content agreement is measured directly, the four roles turn out to be far more distinct in practice than their reputation for overlap suggests.
 
 Targets four role archetypes across all postings: **Data Analyst**, **Analytics Engineer**, **Data Engineer**, and **Data Scientist**.
 
@@ -41,7 +41,8 @@ dbt TRANSFORMATION          (runs after enrichment in same GitHub Actions job)
     staging/     → stg_jsearch, stg_theirstack, stg_builtin (views)
                     field extraction, type casting, HTML stripping, dedup within source
     intermediate/ → int_jobs_unioned (ephemeral)
-                    UNION ALL, cross-source dedup by (title, company), enrichment join
+                    UNION ALL, cross-source dedup by (title, company), enrichment join,
+                    title_role_bucket classification (regex on job_title)
     marts/        → fct_job_postings (table)
                     final wide table powering the dashboard
                                           ↓
@@ -81,7 +82,7 @@ The same job posting often appears on multiple boards. Deduplication runs at two
 The enrichment pipeline sends each job title + description to GPT-4o-mini with a strict system prompt that requests a JSON object conforming to a predefined schema. The response is immediately validated through a Pydantic model (`JobEnrichmentSchema`) before writing — if validation fails, the row is retried up to 3 times before being skipped. Temperature is set to 0 for reproducibility. Fields extracted include: `role_archetype`, `work_focus`, `inferred_seniority`, `title_seniority_signal`, `tech_stack_required/preferred`, `paradigms_required/preferred`, `degree_requirement`, `years_required_min/max`, `acknowledges_ai`, `explicitly_encourages_applicants`, and `salary_min/max`.
 
 ### Listed title vs. LLM-assigned archetype
-Every posting carries two independent labels: `ingestion_query` (the title the job was searched/listed under) and `role_archetype` (what the LLM determined the role actually is, based on the full description). Comparing the two — rather than collapsing them into one — is what surfaces title inflation and role convergence. This comparison is the core analytical mechanism behind the Under the Hood dashboard page.
+Every posting carries two independent labels for "what role is this": `title_role_bucket` (classified directly from the job title via regex) and `role_archetype` (what the LLM determined the role actually is, based on the full description). Comparing the two — rather than collapsing them into one — is what surfaces title inflation and role convergence. Note this is distinct from `ingestion_query` (the search term that originally surfaced the posting), which was found to mislabel a meaningful share of Analytics Engineer postings as Data Engineer due to one source's loose topical search matching — `ingestion_query` is retained for that specific reliability check, but isn't used as a role label anywhere in the analysis. This comparison is the core analytical mechanism behind the Under the Hood dashboard page.
 
 ### Early-career tier — a deliberately narrower seniority field
 Only TheirStack and Built In provide a structured `listed_seniority` field; JSearch does not. Rather than backfill JSearch with a weaker proxy, `early_career_tier` is scoped to just the two sources that self-report seniority, collapsing `entry_level` + `junior` into one tier (since TheirStack's own API can't distinguish them) alongside `mid`. A `years_required_min` cutoff was tested as a JSearch substitute and rejected — junior and mid-level postings overlap too heavily in stated experience requirements to support a clean threshold. Computed directly in the dbt mart (`int_jobs_unioned.sql`), not at dashboard runtime.
@@ -106,13 +107,13 @@ After each run, credit balance and usage stats for JSearch (from rate-limit resp
 
 **Home** — The framing for the investigation: why this project exists, the four role types under examination, and how the data is collected.
 
-**The Landscape** — What does the market look like right now? Posting volume by role type, cumulative frequency over time, work model split, seniority distribution, and salary by role type and seniority.
+**The Landscape** — What does the market look like right now? Posting volume by role type, cumulative frequency over time, work model split, seniority distribution, salary by role type, and experience/degree requirements broken out by role.
 
-**Under the Hood** — What are these roles actually asking for? Tech stack and paradigm overlap heatmaps across role types, a confusion matrix comparing listed title against LLM-assigned archetype, AI acknowledgment rate by role, and experience/degree requirements broken out by role and seniority.
+**Under the Hood** — What are these roles actually asking for? Tech stack and paradigm overlap heatmaps across role types, a confusion matrix comparing listed title against LLM-assigned archetype, a second confusion matrix comparing listed against LLM-inferred seniority, AI acknowledgment rate by role, and industry domain breakdown.
 
 **Job Explorer** — Every posting, filterable by tech stack, role archetype, work model, employment type, source, degree requirement, salary range, and date posted. Selecting any row opens a detail panel showing the full LLM enrichment alongside the raw job description — the exact text the model extracted from, so you can validate the extraction.
 
-**Pipeline Health** — Internal mechanics: ingestion cadence by source over time, LLM enrichment field fill rates, confidence score distribution, per-source health metrics, API credit usage per run with a forecast, and a run history table with duration and jobs-per-credit efficiency.
+**Pipeline Health** — Internal mechanics: ingestion cadence by source over time, LLM enrichment field fill rates, confidence score distribution, per-source health metrics, title classification health, search query reliability, API credit usage per run with a forecast, and a run history table with duration and jobs-per-credit efficiency.
 
 ---
 
@@ -141,7 +142,7 @@ nyc-data-job-market-tracker/
 │       ├── 00_home.py
 │       ├── 01_landscape.py
 │       ├── 02_under_the_hood.py
-│       ├── 03_job_explorer.py
+│       ├── 02_job_explorer.py
 │       └── 04_pipeline_health.py
 ├── infra/
 │   ├── snowflake_client.py     # SnowflakeLoader — routes rows to RAW tables

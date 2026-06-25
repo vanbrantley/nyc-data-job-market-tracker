@@ -33,6 +33,11 @@ SENIORITY_ORDER  = ["entry_or_junior", "mid"]
 SENIORITY_LABELS = {"entry_or_junior": "Entry–Junior", "mid": "Mid"}
 SENIORITY_COLORS = [GREEN, BLUE]
 
+DEGREE_LABELS = {
+        "none": "None", "bachelors": "Bachelor's",
+        "masters": "Master's", "equivalent_ok": "Exp. Accepted",
+    }
+
 SOURCE_LABELS = {"builtin": "Built In NYC", "theirstack": "TheirStack", "jsearch": "JSearch"}
 SOURCE_COLORS = {"builtin": BLUE, "theirstack": TEAL, "jsearch": AMBER}
 
@@ -74,12 +79,14 @@ k4.metric("Salary Disclosed", f"{len(salary_df) / len(df):.0%}")
 st.divider()
 
 # ── Row 1: Postings by Role Type + Work Model by Role ─────────────────────────
-st.markdown("#### Postings by Role Type")
-st.caption("Total postings per role (classified from job title) across all sources")
 
 col1, col2 = st.columns([1, 1.4])
 
 with col1:
+
+    st.markdown("#### Postings by Role Type")
+    st.caption("Total postings per role (classified from job title) across all sources")
+
     role_counts = (
         df.groupby("title_role_bucket")
         .size()
@@ -230,62 +237,124 @@ sen_by_role = (
         .reset_index(name="count")
     )
 
-col5, col6 = st.columns(2)
+# Normalized to % within each role
+sen_pct = sen_by_role.copy()
+totals = sen_pct.groupby("title_role_bucket")["count"].transform("sum")
+sen_pct["pct"] = sen_pct["count"] / totals
 
-with col5:
+fig6 = go.Figure()
+for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
+    subset = sen_pct[sen_pct["early_career_tier"] == sen]
+    subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
+    subset["pct"] = subset["pct"].fillna(0)
+    fig6.add_trace(go.Bar(
+        name=label,
+        x=subset["title_role_bucket"],
+        y=subset["pct"],
+        marker_color=color,
+        hovertemplate=f"{label}: %{{customdata:.0%}} of labeled postings<extra></extra>",
+        customdata=subset["pct"],
+        text=[f"{v:.0%}" if v > 0 else "" for v in subset["pct"]],
+        textposition="inside",
+    ))
+fig6.update_layout(
+    **CHART_LAYOUT, height=320,
+    barmode="stack",
+    xaxis=dict(gridcolor="#1e293b"),
+    yaxis=dict(title="% of Labeled Postings", gridcolor="#1e293b", zeroline=False, tickformat=".0%", range=[0, 1.0]),
+    legend=dict(orientation="h", y=-0.25, font=dict(size=10)),
+)
+st.plotly_chart(fig6, use_container_width=True)
 
-    fig5 = go.Figure()
-    for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
-        subset = sen_by_role[sen_by_role["early_career_tier"] == sen]
-        subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
-        fig5.add_trace(go.Bar(
-            name=label,
-            x=subset["title_role_bucket"],
-            y=subset["count"],
-            marker_color=color,
-            hovertemplate=f"{label}: %{{y}} postings<extra></extra>",
-        ))
-    fig5.update_layout(
-        **CHART_LAYOUT, height=320,
-        barmode="stack",
-        title=dict(text="Count by Seniority", font=dict(size=13)),
-        xaxis=dict(gridcolor="#1e293b"),
-        yaxis=dict(title="# Postings", gridcolor="#1e293b", zeroline=False),
-        legend=dict(orientation="h", y=-0.25, font=dict(size=10)),
+st.divider()
+
+# ── Row: Experience & Degree Requirements ──────────────────────────────────────
+col_deg, col_exp = st.columns(2)
+
+with col_deg:
+    st.markdown("#### Degree Requirements by Role Type")
+    st.caption("Distribution of degree requirements within each role — where specified by the LLM.")
+
+    degree_df = df.dropna(subset=["degree_requirement"]).copy()
+    degree_order = ["none", "bachelors", "masters", "equivalent_ok"]
+    degree_colors = [GREEN, BLUE, PURPLE, AMBER]
+    DEGREE_LABELS = {
+        "none": "None", "bachelors": "Bachelor's",
+        "masters": "Master's", "equivalent_ok": "Exp. Accepted",
+    }
+
+    deg_by_role = (
+        degree_df.groupby(["title_role_bucket", "degree_requirement"])
+        .size()
+        .reset_index(name="count")
     )
-    st.plotly_chart(fig5, use_container_width=True)
+    deg_pct = deg_by_role.copy()
+    totals = deg_pct.groupby("title_role_bucket")["count"].transform("sum")
+    deg_pct["pct"] = deg_pct["count"] / totals
 
-with col6:
-    # Normalize to % within each role
-    sen_pct = sen_by_role.copy()
-    totals = sen_pct.groupby("title_role_bucket")["count"].transform("sum")
-    sen_pct["pct"] = sen_pct["count"] / totals
-
-    fig6 = go.Figure()
-    for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
-        subset = sen_pct[sen_pct["early_career_tier"] == sen]
+    fig_deg = go.Figure()
+    for deg, color in zip(degree_order, degree_colors):
+        subset = deg_pct[deg_pct["degree_requirement"] == deg]
         subset = subset.set_index("title_role_bucket").reindex(role_order).reset_index()
-        fig6.add_trace(go.Bar(
-            name=label,
+        subset["pct"] = subset["pct"].fillna(0)
+        fig_deg.add_trace(go.Bar(
+            name=DEGREE_LABELS.get(deg, deg),
             x=subset["title_role_bucket"],
             y=subset["pct"],
             marker_color=color,
-            hovertemplate=f"{label}: %{{customdata:.0%}} of labeled postings<extra></extra>",
-            customdata=subset["pct"],
-            text=[f"{v:.0%}" if pd.notna(v) else "" for v in subset["pct"]],
+            text=[f"{v:.0%}" if v > 0 else "" for v in subset["pct"]],
             textposition="inside",
+            customdata=subset["pct"],
+            hovertemplate=f"{DEGREE_LABELS.get(deg, deg)}: %{{customdata:.0%}}<extra></extra>",
         ))
-    fig6.update_layout(
+    fig_deg.update_layout(
         **CHART_LAYOUT, height=320,
         barmode="stack",
-        title=dict(text="% Share by Seniority", font=dict(size=13)),
         xaxis=dict(gridcolor="#1e293b"),
-        yaxis=dict(title="% of Labeled Postings", gridcolor="#1e293b", zeroline=False, tickformat=".0%"),
+        yaxis=dict(title="% of Postings", gridcolor="#1e293b", zeroline=False, tickformat=".0%", range=[0, 1.0]),
         legend=dict(orientation="h", y=-0.25, font=dict(size=10)),
     )
-    st.plotly_chart(fig6, use_container_width=True)
+    st.plotly_chart(fig_deg, use_container_width=True)
 
-st.divider()
+with col_exp:
+    st.markdown("#### Experience Requirements by Role Type")
+    st.caption("Built In NYC / TheirStack only, where seniority and experience were both specified.")
+
+    yrs_df = df.dropna(subset=["years_required_min"]).copy()
+    yrs_df = yrs_df[yrs_df["early_career_tier"].isin(SENIORITY_ORDER)]
+
+    yrs_by_role_sen = (
+        yrs_df.groupby(["title_role_bucket", "early_career_tier"])["years_required_min"]
+        .agg(["median", "count"])
+        .reset_index()
+    )
+    yrs_by_role_sen.columns = ["role", "seniority", "median", "n"]
+
+    fig_yrs = go.Figure()
+    for sen, label, color in zip(SENIORITY_ORDER, SENIORITY_LABELS.values(), SENIORITY_COLORS):
+        subset = yrs_by_role_sen[yrs_by_role_sen["seniority"] == sen]
+        subset = subset.set_index("role").reindex(role_order).reset_index()
+        fig_yrs.add_trace(go.Bar(
+            name=label,
+            x=subset["role"],
+            y=subset["median"],
+            marker_color=color,
+            customdata=subset["n"].values,
+            hovertemplate=f"{label}: %{{y:.1f}} yrs median (n=%{{customdata}})<extra></extra>",
+        ))
+    fig_yrs.update_layout(
+        **CHART_LAYOUT, height=320,
+        barmode="group",
+        yaxis=dict(title="Median Years Required", gridcolor="#1e293b", zeroline=False),
+        legend=dict(orientation="h", y=-0.3, font=dict(size=10)),
+    )
+    st.plotly_chart(fig_yrs, use_container_width=True)
+
+    n_with_yrs = len(yrs_df)
+    st.caption(
+        f"Based on {n_with_yrs} of {len(df)} postings ({n_with_yrs/len(df):.0%}) that specified "
+        f"both a listed seniority and years of experience."
+    )
 
 # ── Row 4: Salary by Role Type ────────────────────────────────────────────────
 st.markdown("#### Salary by Role Type")
