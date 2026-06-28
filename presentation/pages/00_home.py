@@ -27,18 +27,20 @@ st.divider()
 st.markdown("#### The Question")
 st.markdown(
     """
-As someone entering the data job market, I found the landscape genuinely confusing.
+Data Analyst, Data Engineer, Analytics Engineer, Data Scientist — four titles 
+that show up constantly in the NYC job market, each with a supposed 
+definition, and a reputation for overlapping in practice. Tools get 
+shared across them. Responsibilities get shared across them. And with
+AI reshaping how data work actually gets done, it's a fair question whether 
+the roles themselves still mean what they used to.
 
-There are several distinct job titles — Data Analyst, Data Engineer, Analytics Engineer, 
-Data Scientist — each with their own supposed definition. But in practice, the lines between 
-them are blurry. The tools overlap. The responsibilities overlap. And with AI reshaping how 
-data work gets done, the roles themselves appear to be shifting in real time.
+Rather than rely on secondhand takes, I built a pipeline to check directly: 
+ingesting live job postings from multiple sources, running each one through 
+an LLM to extract what a posting actually asks for underneath its title, and 
+comparing that against the title itself.
 
-Rather than rely on secondhand takes, I built a pipeline to track it directly: 
-ingesting live job postings from multiple sources, enriching them with an LLM to cut 
-through title noise, and surfacing the patterns in this dashboard.
-
-The goal isn't a definitive answer. It's a clearer picture.
+The roles turn out to be more distinct than their reputation suggests — and 
+this dashboard is where you can see that directly.
 """
 )
 

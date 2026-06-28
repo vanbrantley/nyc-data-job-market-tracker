@@ -282,14 +282,11 @@ if not matrix_df.empty:
 
     # Agreement rate summary
     total_enriched = matrix_df.shape[0]
-    # Agreement = title_role_bucket word matches role_archetype word (loose match)
+    # Agreement = title_role_bucket exactly matches role_archetype (normalized).
     def roles_match(row):
         listed = row["title_role_bucket"].lower().replace(" ", "_").replace("-", "_")
         archetype = row["role_archetype"].lower()
-        # check if the core words overlap
-        listed_words = set(listed.split("_"))
-        archetype_words = set(archetype.split("_"))
-        return bool(listed_words & archetype_words)
+        return listed == archetype
 
     agree_n = matrix_df.apply(roles_match, axis=1).sum()
     st.caption(
