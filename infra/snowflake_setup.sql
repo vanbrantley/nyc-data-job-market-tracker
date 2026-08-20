@@ -75,25 +75,26 @@ CREATE TABLE IF NOT EXISTS raw.builtin.src_postings (
 -- STEP 5: Create enrichment table
 ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS enriched.public.job_enrichment (
-    job_id               VARCHAR,
-    source               VARCHAR,
-    inferred_seniority   VARCHAR,
-    is_title_inflated    BOOLEAN,
-    inflation_reasoning  VARCHAR,
-    role_archetype       VARCHAR,
-    work_focus           VARCHAR,
-    tech_stack_required  VARIANT,
-    tech_stack_preferred VARIANT,
-    paradigms_required   VARIANT,
-    paradigms_preferred  VARIANT,
-    degree_requirement   VARCHAR,
-    years_required_min   INTEGER,
-    years_required_max   INTEGER,
-    salary_min           FLOAT,
-    salary_max           FLOAT,
-    confidence_score     FLOAT,
-    enriched_at          TIMESTAMP_TZ,
-    model_version        VARCHAR
+    job_id                          VARCHAR,
+    source                          VARCHAR,
+    inferred_seniority              VARCHAR,
+    role_archetype                  VARCHAR,
+    work_focus                      VARCHAR,
+    tech_stack_required             VARIANT,
+    tech_stack_preferred            VARIANT,
+    paradigms_required              VARIANT,
+    paradigms_preferred             VARIANT,
+    degree_requirement              VARCHAR,
+    years_required_min              INTEGER,
+    years_required_max              INTEGER,
+    salary_min                      FLOAT,
+    salary_max                      FLOAT,
+    acknowledges_ai                 BOOLEAN,
+    domain                          VARCHAR,
+    explicitly_encourages_applicants BOOLEAN,
+    confidence_score                FLOAT,
+    enriched_at                     TIMESTAMP_TZ,
+    model_version                   VARCHAR
 );
 
 -- Note: analytics_dev and analytics_prod need no table
@@ -134,13 +135,14 @@ CREATE TABLE IF NOT EXISTS raw.pipeline.runs (
 );
 
 CREATE TABLE IF NOT EXISTS raw.pipeline.api_usage (
-    run_id              VARCHAR         NOT NULL,
-    run_at              TIMESTAMP_TZ    NOT NULL,
-    source              VARCHAR         NOT NULL,
-    credits_remaining   INTEGER,
-    credits_limit       INTEGER,
-    credits_used        INTEGER,
-    reset_date          VARCHAR
+    run_id                  VARCHAR         NOT NULL,
+    run_at                  TIMESTAMP_TZ    NOT NULL,
+    source                  VARCHAR         NOT NULL,
+    credits_remaining       INTEGER,
+    credits_limit           INTEGER,
+    credits_used_cumulative INTEGER,
+    credits_used_this_run   INTEGER,
+    reset_date              VARCHAR
 );
 
 GRANT ALL PRIVILEGES ON SCHEMA raw.pipeline TO ROLE SYSADMIN;
