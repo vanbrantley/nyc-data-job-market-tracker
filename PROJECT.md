@@ -279,6 +279,17 @@ WHERE RAW_PAYLOAD:source_url::STRING = '<url>'
 
 ---
 
+## Refreshing the Portfolio Write-up
+
+The "Early Signals" section of the external portfolio write-up (not tracked in this repo — lives on the personal site, pasted in by hand) is built from stats computed against `FCT_JOB_POSTINGS`. Since the pipeline keeps accumulating postings, those numbers go stale and need periodic refreshing.
+
+- `presentation/notebooks/findings_lib.py` — shared functions (one per stat: role/source breakdown, salary by role, title-vs-archetype self-consistency, AI acknowledgment, degree requirements, listed-vs-inferred seniority mismatch, etc.). Single source of truth used by both the notebook and the snapshot script below.
+- `presentation/notebooks/findings.ipynb` — the interactive/exploratory notebook, now calling into `findings_lib` per cell. This is where to poke at anything unexpected before it becomes a headline number.
+- `presentation/notebooks/generate_findings_snapshot.py` — run this to refresh: computes the headline metrics the write-up actually cites, writes a dated JSON snapshot to `presentation/notebooks/findings_snapshots/`, and prints a diff against the most recent prior snapshot so it's obvious what actually moved since the write-up was last updated. These snapshot JSONs are deliberately carved out of the blanket `*.json` gitignore rule (see `.gitignore`) so history is preserved.
+- `/refresh-findings` (`.claude/commands/refresh-findings.md`) — the on-demand trigger: runs the snapshot script, reads the new numbers + diff, and drafts specific edits to the write-up's prose (pasted into the chat) reflecting what changed.
+
+---
+
 ## Streamlit Dashboard
 
 **Pages:**

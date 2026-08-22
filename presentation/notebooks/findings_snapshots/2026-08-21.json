@@ -1,0 +1,69 @@
+{
+  "run_date": "2026-08-21",
+  "dataset": {
+    "total_postings": 1225,
+    "unique_companies": 901,
+    "sources": 3,
+    "date_min": "2026-05-27",
+    "date_max": "2026-08-20",
+    "last_ingested": "2026-08-20",
+    "salary_disclosed_rate": 0.6449
+  },
+  "postings_by_role": {
+    "Data Analyst": 460,
+    "Data Engineer": 351,
+    "Data Scientist": 324,
+    "Analytics Engineer": 90
+  },
+  "title_self_consistency": {
+    "overall_rate": 0.9665,
+    "by_role": {
+      "Analytics Engineer": 0.9222,
+      "Data Analyst": 0.9609,
+      "Data Engineer": 0.9743,
+      "Data Scientist": 0.9784
+    }
+  },
+  "median_salary_by_role": {
+    "Analytics Engineer": 133312.0,
+    "Data Analyst": 93502.0,
+    "Data Engineer": 130000.0,
+    "Data Scientist": 142064.0
+  },
+  "ai_acknowledgment": {
+    "overall_rate": 0.5322,
+    "by_role": {
+      "Analytics Engineer": 0.611,
+      "Data Analyst": 0.322,
+      "Data Engineer": 0.484,
+      "Data Scientist": 0.861
+    }
+  },
+  "masters_degree_rate_by_role": {
+    "Analytics Engineer": 0.0,
+    "Data Analyst": 0.033,
+    "Data Engineer": 0.034,
+    "Data Scientist": 0.256
+  },
+  "listed_vs_inferred_seniority_pct": {
+    "entry_level": {
+      "entry": 0.88,
+      "junior": 0.12,
+      "mid": 0.0,
+      "senior": 0.0
+    },
+    "junior": {
+      "entry": 0.19,
+      "junior": 0.77,
+      "mid": 0.03,
+      "senior": 0.01
+    },
+    "mid_level": {
+      "entry": 0.08,
+      "junior": 0.23,
+      "mid": 0.55,
+      "senior": 0.15
+    }
+  },
+  "encourages_applicants_overall_rate": 0.1208
+}

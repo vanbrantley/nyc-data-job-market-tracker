@@ -77,3 +77,7 @@ transformation/profiles.yml
 *.json
 *.xlsx
 *.gz
+
+# Exception: aggregate metric snapshots for the portfolio write-up refresh
+# workflow are meant to be tracked for history/diffing, not local data dumps.
+!presentation/notebooks/findings_snapshots/*.json
